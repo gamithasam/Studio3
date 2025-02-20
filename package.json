@@ -1,19 +1,14 @@
 {
   "name": "animotion",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron ."
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "codemirror": "^6.0.1",
-    "electron": "^34.2.0",
-    "gsap": "^3.12.7",
-    "split.js": "^1.6.5",
-    "three": "^0.173.0"
+    "electron": "^26.0.0",
+    "monaco-editor": "^0.38.0",
+    "three": "^0.152.0",
+    "gsap": "^3.12.2"
   }
 }

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Animotion</title>
+  <style>
+    html, body {
+      margin: 0; 
+      padding: 0; 
+      height: 100%; 
+      overflow: hidden;
+      display: flex;
+    }
+    #editor, #preview {
+      flex: 1;
+      border: 1px solid #ccc; 
+      box-sizing: border-box;
+    }
+    #preview {
+      background: #2e2e2e; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center;
+      justify-content: center;
+    }
+    #threeCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="editor"></div>
+  <div id="preview">
+    <canvas id="threeCanvas"></canvas>
+  </div>
+  <!-- Script references for monaco editor. If not bundling, you can use node_modules path/serve them locally. -->
+  <!-- You may need to copy node_modules/monaco-editor/min/vs to a static folder and reference it properly. -->
+  <!-- For example: <script src="./vs/loader.js"></script> then configure require.config(...) -->
+  
+  <!-- Our main renderer logic -->
+  <script src="renderer.js"></script>
+</body>
+</html>
