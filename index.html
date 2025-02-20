@@ -11,36 +11,141 @@
       overflow: hidden;
       display: flex;
       background-color: #1e1e1e;
+      color: #ffffff;
     }
-    #editor, #preview {
-      flex: 1;
-      box-sizing: border-box;
+    
+    /* Main layout */
+    .container {
+      display: flex;
+      width: 100%;
+      height: 100%;
     }
-    #editor {
+    
+    /* Slides panel */
+    .slides-panel {
+      width: 200px;
+      background: #252526;
       border-right: 1px solid #333;
-      overflow: auto;
+      display: flex;
+      flex-direction: column;
     }
+    
+    .slides-header {
+      padding: 10px;
+      background: #333333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .slides-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    
+    .slide-thumbnail {
+      height: 100px;
+      background: #2d2d2d;
+      margin-bottom: 10px;
+      border: 1px solid #404040;
+      cursor: pointer;
+      padding: 8px;
+    }
+    
+    .slide-thumbnail.active {
+      border-color: #0078d4;
+    }
+    
+    /* Editor section */
+    .editor-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .toolbar {
+      height: 40px;
+      background: #333333;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 10px;
+    }
+    
+    #editor {
+      flex: 1;
+      border-right: 1px solid #333;
+      overflow: hidden;
+    }
+    
+    /* Preview section */
     #preview {
+      flex: 1;
       background: #2e2e2e;
       position: relative;
     }
+    
     #threeCanvas {
       width: 100%;
       height: 100%;
       display: block;
     }
+    
+    /* Buttons */
+    button {
+      background: #0078d4;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    button:hover {
+      background: #106ebe;
+    }
+    
+    .collapse-button {
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      cursor: pointer;
+      padding: 4px;
+    }
   </style>
 </head>
 <body>
-  <div id="editor"></div>
-  <div id="preview">
-    <canvas id="threeCanvas"></canvas>
+  <div class="container">
+    <div class="slides-panel" id="slidesPanel">
+      <div class="slides-header">
+        <span>Slides</span>
+        <button class="collapse-button" id="collapseButton">◀</button>
+      </div>
+      <div class="slides-list" id="slidesList">
+        <!-- Slide thumbnails will be added here dynamically -->
+      </div>
+    </div>
+    
+    <div class="editor-section">
+      <div class="toolbar">
+        <button id="addSlideBtn">Add New Slide</button>
+        <button id="playBtn">▶ Play</button>
+      </div>
+      <div id="editor"></div>
+    </div>
+    
+    <div id="preview">
+      <canvas id="threeCanvas"></canvas>
+    </div>
   </div>
-  <!-- Load Three.js from a CDN (or copy three.min.js to your project and update the path) -->
+  
+  <!-- Load Three.js from a CDN -->
   <script src="https://unpkg.com/three@0.152.0/build/three.min.js"></script>
   <!-- Load GSAP from a CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-  <!-- Load Monaco Editor assets. Ensure you have copied monaco-editor/min/vs to a folder named "vs" -->
+  <!-- Load Monaco Editor assets -->
   <script src="./vs/loader.js"></script>
   <script src="renderer.js"></script>
 </body>
