@@ -101,9 +101,10 @@ playSlides(slides);
 
   oneSlideTab.addEventListener('click', () => {
     showSingleSlide = true;
-    // If there’s a current slide selected, show it; else just show the first
-    const singleSlide = parsedSlides[currentSlideIndex] ? parsedSlides[currentSlideIndex].code : '';
-    editorInstance.setValue(singleSlide);
+    // If there's a current slide selected, show it; else just show the first
+    const slide = parsedSlides[currentSlideIndex] ? parsedSlides[currentSlideIndex].code : '';
+    // Wrap the slide snippet in parentheses so it is interpreted as an object literal expression.
+    editorInstance.setValue(`(${slide})`);
     oneSlideTab.classList.add('active');
     allSlidesTab.classList.remove('active');
   });
@@ -178,10 +179,10 @@ playSlides(slides);
         currentSlideIndex = index;
         transitionInSlide(currentSlideIndex);
         updateSlidesThumbnails();
-  
-        // If in single-slide mode, update editor content
+      
+        // If in single-slide mode, update editor content with proper wrapping
         if (showSingleSlide && parsedSlides[index]) {
-          editorInstance.setValue(parsedSlides[index].code);
+          editorInstance.setValue(`(${parsedSlides[index].code})`);
         }
       };
       slidesList.appendChild(thumbnail);
