@@ -53,6 +53,61 @@ playSlides(slides);
     theme: 'vs-dark'
   });
 
+  // Store the original code and set up tab elements
+  const originalCode = editorInstance.getValue();
+  const allSlidesTab = document.getElementById('allSlidesTab');
+  const oneSlideTab = document.getElementById('oneSlideTab');
+  let showSingleSlide = false;
+
+  // Parse out the slides from the user’s code:
+  function getSlidesArray(code) {
+    const match = code.match(/const\s+slides\s*=\s*\[([\s\S]*?)\];/);
+    if (!match) return [];
+  
+    const slidesContent = match[1].trim();
+    let slides = [];
+    let bracketCount = 0;
+    let startIndex = -1;
+  
+    for (let i = 0; i < slidesContent.length; i++) {
+      if (slidesContent[i] === '{') {
+        if (bracketCount === 0) {
+          startIndex = i;
+        }
+        bracketCount++;
+      } else if (slidesContent[i] === '}') {
+        bracketCount--;
+        if (bracketCount === 0 && startIndex >= 0) {
+          const slideCode = slidesContent.slice(startIndex, i + 1).trim();
+          slides.push(slideCode);
+          startIndex = -1;
+        }
+      }
+    }
+  
+    return slides.map((code, index) => ({ index, code }));
+  }
+
+  // Capture slides from the original code
+  const parsedSlides = getSlidesArray(originalCode);
+
+  // Toggle tabs
+  allSlidesTab.addEventListener('click', () => {
+    showSingleSlide = false;
+    editorInstance.setValue(originalCode);
+    allSlidesTab.classList.add('active');
+    oneSlideTab.classList.remove('active');
+  });
+
+  oneSlideTab.addEventListener('click', () => {
+    showSingleSlide = true;
+    // If there’s a current slide selected, show it; else just show the first
+    const singleSlide = parsedSlides[currentSlideIndex] ? parsedSlides[currentSlideIndex].code : '';
+    editorInstance.setValue(singleSlide);
+    oneSlideTab.classList.add('active');
+    allSlidesTab.classList.remove('active');
+  });
+
   // Set up Three.js in the right pane
   const canvas = document.getElementById('threeCanvas');
   const renderer = new THREE.WebGLRenderer({ canvas });
@@ -123,6 +178,11 @@ playSlides(slides);
         currentSlideIndex = index;
         transitionInSlide(currentSlideIndex);
         updateSlidesThumbnails();
+  
+        // If in single-slide mode, update editor content
+        if (showSingleSlide && parsedSlides[index]) {
+          editorInstance.setValue(parsedSlides[index].code);
+        }
       };
       slidesList.appendChild(thumbnail);
     });
