@@ -160,11 +160,20 @@ playSlides(slides);
   const slidesList = document.getElementById('slidesList');
   const addSlideBtn = document.getElementById('addSlideBtn');
   const playBtn = document.getElementById('playBtn');
+  const slidesContent = document.getElementById('slidesContent');
+  const expandButton = document.getElementById('expandButton');
 
   // Collapse panel functionality
   collapseButton.addEventListener('click', () => {
-    slidesPanel.style.width = slidesPanel.style.width === '40px' ? '200px' : '40px';
-    collapseButton.textContent = slidesPanel.style.width === '40px' ? '▶' : '◀';
+    slidesPanel.style.width = '40px';
+    slidesContent.style.display = 'none';
+    expandButton.classList.remove('hidden');
+  });
+
+  expandButton.addEventListener('click', () => {
+    slidesPanel.style.width = '200px';
+    slidesContent.style.display = 'flex';
+    expandButton.classList.add('hidden');
   });
 
   // Update slides thumbnails
