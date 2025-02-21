@@ -114,6 +114,32 @@
       cursor: pointer;
       padding: 4px;
     }
+
+    /* Editor tabs */
+    .editor-tabs {
+      background: #252526;
+      padding: 8px 10px 0;
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid #333;
+    }
+
+    .editor-tab {
+      background: #2d2d2d;
+      color: #888;
+      border: none;
+      border-radius: 3px 3px 0 0;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .editor-tab.active {
+      background: #1e1e1e;
+      color: #fff;
+      border-bottom: 2px solid #0078d4;
+    }
   </style>
 </head>
 <body>
@@ -132,6 +158,11 @@
       <div class="toolbar">
         <button id="addSlideBtn">Add New Slide</button>
         <button id="playBtn">▶ Play</button>
+      </div>
+      <!-- Add to editor-section after toolbar -->
+      <div class="editor-tabs">
+        <button id="allSlidesTab" class="editor-tab active">All Slides</button>
+        <button id="oneSlideTab" class="editor-tab">One Slide</button>
       </div>
       <div id="editor"></div>
     </div>
