@@ -58,12 +58,24 @@ playSlides(slides);
   const renderer = new THREE.WebGLRenderer({ canvas });
   renderer.setPixelRatio(window.devicePixelRatio);
   
+  const preview = document.getElementById('preview');
+
+  // Resize renderer: use the canvas element's client size when not in full screen.
+  // When in full screen, enforce a 16:9 aspect ratio so the preview isn't stretched.
   function resizeRenderer() {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    if (canvas.width !== width || canvas.height !== height) {
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
+    let newWidth, newHeight;
+    if (document.fullscreenElement) {
+      const previewRect = preview.getBoundingClientRect();
+      // Calculate dimensions based on a fixed 16:9 ratio. We'll choose the largest size that fits
+      newWidth = Math.min(previewRect.width, previewRect.height * (16 / 9));
+      newHeight = newWidth / (16 / 9);
+    } else {
+      newWidth = canvas.clientWidth;
+      newHeight = canvas.clientHeight;
+    }
+    if (canvas.width !== newWidth || canvas.height !== newHeight) {
+      renderer.setSize(newWidth, newHeight, false);
+      camera.aspect = newWidth / newHeight;
       camera.updateProjectionMatrix();
     }
   }
@@ -148,7 +160,7 @@ playSlides(slides);
     runUserCode(newCode);
   });
 
-  // Play functionality
+  // Updated play functionality to toggle full screen on the preview
   playBtn.addEventListener('click', togglePlay);
 
   function togglePlay() {
@@ -156,6 +168,15 @@ playSlides(slides);
     playBtn.textContent = isPlaying ? '⏸ Pause' : '▶ Play';
     
     if (isPlaying) {
+      // Request full screen on the preview element when play is activated.
+      if (preview.requestFullscreen) {
+        preview.requestFullscreen();
+      } else if (preview.webkitRequestFullscreen) { /* Safari */
+        preview.webkitRequestFullscreen();
+      } else if (preview.msRequestFullscreen) { /* IE11 */
+        preview.msRequestFullscreen();
+      }
+      
       playInterval = setInterval(() => {
         transitionOutSlide(currentSlideIndex);
         currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
@@ -163,9 +184,44 @@ playSlides(slides);
         updateSlidesThumbnails();
       }, 3000); // Change slide every 3 seconds
     } else {
+      // Exit full screen if currently in full screen mode.
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
       clearInterval(playInterval);
     }
   }
+
+  // Set up key event handling to run code or change slides and exit full screen on Esc.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.fullscreenElement) {
+      document.exitFullscreen();
+      if (isPlaying) {
+        // Stop slide playback and update play button text when exiting full screen.
+        clearInterval(playInterval);
+        isPlaying = false;
+        playBtn.textContent = '▶ Play';
+      }
+    } else if (e.key === 'Enter') {
+      // Run/re-run the code when Enter is pressed
+      const userCode = editorInstance.getValue();
+      runUserCode(userCode);
+    } else if (e.key === 'ArrowRight') {
+      // Move to next slide
+      if (slidesArray.length > 0) {
+        transitionOutSlide(currentSlideIndex);
+        currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
+        transitionInSlide(currentSlideIndex);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      // Move to previous slide
+      if (slidesArray.length > 0) {
+        transitionOutSlide(currentSlideIndex);
+        currentSlideIndex = (currentSlideIndex - 1 + slidesArray.length) % slidesArray.length;
+        transitionInSlide(currentSlideIndex);
+      }
+    }
+  });
 
   // Function to run user code from the editor in a sandboxed function
   function runUserCode(code) {
@@ -220,29 +276,6 @@ playSlides(slides);
       slidesArray[index].transitionOut(slideData[index]);
     }
   }
-
-  // Set up key event handling to run code or change slides
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      // Run/re-run the code when Enter is pressed
-      const userCode = editorInstance.getValue();
-      runUserCode(userCode);
-    } else if (e.key === 'ArrowRight') {
-      // Move to next slide
-      if (slidesArray.length > 0) {
-        transitionOutSlide(currentSlideIndex);
-        currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
-        transitionInSlide(currentSlideIndex);
-      }
-    } else if (e.key === 'ArrowLeft') {
-      // Move to previous slide
-      if (slidesArray.length > 0) {
-        transitionOutSlide(currentSlideIndex);
-        currentSlideIndex = (currentSlideIndex - 1 + slidesArray.length) % slidesArray.length;
-        transitionInSlide(currentSlideIndex);
-      }
-    }
-  });
 
   // Run the initial code automatically on load
   runUserCode(editorInstance.getValue());
