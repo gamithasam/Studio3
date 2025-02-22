@@ -8,40 +8,130 @@ require(['vs/editor/editor.main'], function(monaco) {
   const editorContainer = document.getElementById('editor');
   const editorInstance = monaco.editor.create(editorContainer, {
     value: `// Modify the code and press Enter or click Play to run it.
-// This example defines two slides with basic animations.
+// This example defines slides that can mix 2D and 3D content freely.
 
 const slides = [
   {
-    init(scene) {
-      // Slide 1: Red Cube
-      const geometry = new THREE.BoxGeometry();
-      const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    init({ scene, container }) {
+      // Slide 1: Title with floating 3D cube
+      const title = document.createElement('h1');
+      title.textContent = 'Welcome to Animotion';
+      title.style.cssText = 'color: white; opacity: 0; position: relative;';
+      
+      const subtitle = document.createElement('h2');
+      subtitle.textContent = 'Mix 2D and 3D Content Freely!';
+      subtitle.style.cssText = 'color: #888; opacity: 0; position: relative;';
+      
+      container.appendChild(title);
+      container.appendChild(subtitle);
+      
+      // Add a floating 3D cube
+      const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      const material = new THREE.MeshBasicMaterial({ color: 0x6495ED });
       const cube = new THREE.Mesh(geometry, material);
+      cube.position.set(-2, 1, 0);
       scene.add(cube);
-      return { cube };
+      
+      return { title, subtitle, cube };
     },
-    transitionIn({ cube }) {
-      gsap.fromTo(cube.scale, { x: 0, y: 0, z: 0 }, { duration: 1, x: 1, y: 1, z: 1 });
+    transitionIn({ title, subtitle, cube }) {
+      // Animate 2D elements
+      gsap.to(title, { duration: 1, opacity: 1, y: 20 });
+      gsap.to(subtitle, { duration: 1, opacity: 1, y: 20, delay: 0.5 });
+      
+      // Animate 3D elements
+      gsap.to(cube.position, { 
+        duration: 2,
+        x: 2,
+        ease: "power1.inOut",
+        repeat: -1,
+        yoyo: true
+      });
+      gsap.to(cube.rotation, {
+        duration: 3,
+        y: Math.PI * 2,
+        repeat: -1,
+        ease: "none"
+      });
     },
-    transitionOut({ cube }) {
-      gsap.to(cube.position, { duration: 1, x: 2 });
+    transitionOut({ title, subtitle, cube }) {
+      gsap.to([title, subtitle], { duration: 0.5, opacity: 0, y: -20 });
+      gsap.to(cube.position, { duration: 0.5, y: -2 });
     }
   },
   {
-    init(scene) {
-      // Slide 2: Green Sphere
-      const geometry = new THREE.SphereGeometry(0.5, 32, 32);
-      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-      const sphere = new THREE.Mesh(geometry, material);
-      sphere.position.x = -2;
-      scene.add(sphere);
-      return { sphere };
+    init({ scene, container }) {
+      // Slide 2: Content with 3D visualization
+      const content = document.createElement('div');
+      content.style.cssText = 'position: relative; padding: 20px;';
+      content.innerHTML = \`
+        <h2 style="color: white; opacity: 0">Key Features</h2>
+        <ul style="color: white; font-size: 1.5em">
+          <li style="opacity: 0">Mix 2D and 3D content ✨</li>
+          <li style="opacity: 0">Smooth transitions 🎭</li>
+          <li style="opacity: 0">Easy to customize 🎨</li>
+        </ul>
+      \`;
+      container.appendChild(content);
+      
+      // Create a 3D visualization
+      const group = new THREE.Group();
+      const shapes = [];
+      const colors = [0xff0000, 0x00ff00, 0x0000ff];
+      
+      for(let i = 0; i < 3; i++) {
+        const geometry = new THREE.SphereGeometry(0.2, 16, 16);
+        const material = new THREE.MeshBasicMaterial({ color: colors[i] });
+        const sphere = new THREE.Mesh(geometry, material);
+        sphere.position.set(1.5, 0.5 - i * 0.5, 0);
+        group.add(sphere);
+        shapes.push(sphere);
+      }
+      
+      scene.add(group);
+      
+      return {
+        title: content.querySelector('h2'),
+        items: Array.from(content.querySelectorAll('li')),
+        shapes,
+        group
+      };
     },
-    transitionIn({ sphere }) {
-      gsap.fromTo(sphere.scale, { x: 0, y: 0, z: 0 }, { duration: 1, x: 1, y: 1, z: 1 });
+    transitionIn({ title, items, shapes, group }) {
+      // Animate 2D elements
+      gsap.to(title, { duration: 0.5, opacity: 1 });
+      gsap.to(items, {
+        duration: 0.5,
+        opacity: 1,
+        x: 20,
+        stagger: 0.2
+      });
+      
+      // Animate 3D elements
+      shapes.forEach((sphere, i) => {
+        gsap.from(sphere.position, {
+          duration: 1,
+          x: -2,
+          delay: i * 0.2,
+          ease: "back.out"
+        });
+      });
+      
+      // Continuous rotation animation
+      gsap.to(group.rotation, {
+        duration: 4,
+        y: Math.PI * 2,
+        repeat: -1,
+        ease: "none"
+      });
     },
-    transitionOut({ sphere }) {
-      gsap.to(sphere.position, { duration: 1, x: 2 });
+    transitionOut({ title, items, shapes, group }) {
+      gsap.to([title, ...items], { duration: 0.5, opacity: 0 });
+      gsap.to(shapes.map(s => s.position), {
+        duration: 0.5,
+        x: 3,
+        stagger: 0.1
+      });
     }
   }
 ];
@@ -52,6 +142,24 @@ playSlides(slides);
     automaticLayout: true,
     theme: 'vs-dark'
   });
+
+  // Create a container for 2D content
+  const overlay2D = document.createElement('div');
+  overlay2D.id = '2d-overlay';
+  overlay2D.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+    z-index: 1;
+  `;
+  document.getElementById('preview').appendChild(overlay2D);
 
   // Store the original code and set up tab elements
   const originalCode = editorInstance.getValue();
@@ -111,7 +219,11 @@ playSlides(slides);
 
   // Set up Three.js in the right pane
   const canvas = document.getElementById('threeCanvas');
-  const renderer = new THREE.WebGLRenderer({ canvas });
+  const renderer = new THREE.WebGLRenderer({ 
+    canvas,
+    alpha: true  // Make background transparent to show 2D content behind
+  });
+  renderer.setClearColor(0x000000, 0.9);  // Slightly transparent background
   renderer.setPixelRatio(window.devicePixelRatio);
   
   const preview = document.getElementById('preview');
@@ -295,21 +407,21 @@ playSlides(slides);
 
   // Function to run user code from the editor in a sandboxed function
   function runUserCode(code) {
-    // Stop playing if active
     if (isPlaying) {
       togglePlay();
     }
     
-    // Clear the scene
+    // Clear both 3D scene and 2D overlay
     while (scene.children.length > 0) {
       scene.remove(scene.children[0]);
     }
+    overlay2D.innerHTML = '';
+    
     slidesArray = [];
     slideData = [];
     currentSlideIndex = 0;
 
     try {
-      // Create a new function to evaluate the user code.
       const userFn = new Function('THREE', 'gsap', 'scene', 'playSlides', code);
       userFn(THREE, gsap, scene, playSlides);
     } catch (err) {
@@ -322,29 +434,62 @@ playSlides(slides);
     slidesArray = slides;
     slideData = slides.map(() => null);
 
-    // Initialize each slide
+    // Initialize each slide with both scene and container access
     slidesArray.forEach((slide, idx) => {
-      slideData[idx] = slide.init(scene);
+      // Create a container for this slide's 2D content
+      const slideContainer = document.createElement('div');
+      slideContainer.style.cssText = `
+        display: none;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+      `;
+      overlay2D.appendChild(slideContainer);
+
+      // Initialize slide with access to both 3D scene and 2D container
+      slideData[idx] = slide.init({
+        scene,
+        container: slideContainer
+      });
+      slideData[idx]._container = slideContainer;
     });
 
-    // Update the slides thumbnails
     updateSlidesThumbnails();
-
-    // Start with the first slide
     transitionInSlide(0);
   }
 
   function transitionInSlide(index) {
-    if (slidesArray[index] && slidesArray[index].transitionIn) {
-      slidesArray[index].transitionIn(slideData[index]);
+    const slide = slidesArray[index];
+    const data = slideData[index];
+    
+    if (!slide || !data) return;
+
+    // Show current slide's 2D container
+    data._container.style.display = 'flex';
+
+    if (slide.transitionIn) {
+      slide.transitionIn(data);
     }
+    
     updateSlidesThumbnails();
   }
 
   function transitionOutSlide(index) {
-    if (slidesArray[index] && slidesArray[index].transitionOut) {
-      slidesArray[index].transitionOut(slideData[index]);
+    const slide = slidesArray[index];
+    const data = slideData[index];
+    
+    if (!slide || !data) return;
+
+    if (slide.transitionOut) {
+      slide.transitionOut(data);
     }
+
+    // Hide 2D container after transition
+    setTimeout(() => {
+      data._container.style.display = 'none';
+    }, 1000);
   }
 
   // Run the initial code automatically on load
