@@ -524,12 +524,12 @@ playSlides(slides);
         preview.msRequestFullscreen();
       }
       
-      playInterval = setInterval(() => {
-        transitionOutSlide(currentSlideIndex);
-        currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
-        transitionInSlide(currentSlideIndex);
-        updateSlidesThumbnails();
-      }, 3000); // Change slide every 3 seconds
+      // playInterval = setInterval(() => {
+      //   transitionOutSlide(currentSlideIndex);
+      //   currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
+      //   transitionInSlide(currentSlideIndex);
+      //   updateSlidesThumbnails();
+      // }, 3000); // Change slide every 3 seconds
     } else {
       // Exit full screen if currently in full screen mode.
       if (document.fullscreenElement) {
