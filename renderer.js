@@ -513,8 +513,7 @@ playSlides(slides);
         updateSlidesThumbnails();
 
         if (showSingleSlide) {
-          const currentCode = editorInstance.getValue();
-          const freshSlides = getSlidesArray(currentCode);
+          const freshSlides = getSlidesArray(originalCode);
           
           if (freshSlides.length > index) {
             editorInstance.setValue(`(${freshSlides[currentSlideIndex].code})`);
