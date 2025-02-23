@@ -690,7 +690,7 @@ playSlides(slides);
       lastClickedElement = element;
       // Show existing properties
       fontInput.value = element.style.fontFamily || 'Arial';
-      fontSizeInput.value = parseInt(element.style.fontSize) || 16;
+      fontSizeInput.value = parseInt(element.style.fontSize);
       colorInput.value = element.style.color || '#ffffff';
       // Open the pane
       bottomPane.classList.add('visible');
