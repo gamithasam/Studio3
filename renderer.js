@@ -415,7 +415,7 @@ playSlides(slides);
   oneSlideTab.addEventListener('click', () => {
     if (!showSingleSlide) {
       // Merge changes if coming from all slides mode (optional)
-      mergeOneSlideChanges();
+      // mergeOneSlideChanges();
     }
     showSingleSlide = true;
     const freshSlides = getSlidesArray(originalCode);
