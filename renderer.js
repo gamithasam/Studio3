@@ -764,3 +764,15 @@ function rgbToHex(rgb) {
   // Run the initial code automatically on load
   runUserCode(editorInstance.getValue());
 });
+
+window.electronAPI.getSystemFonts().then(fonts => {
+  const fontList = document.getElementById('fontList');
+  fontList.innerHTML = '';
+  
+  fonts.forEach(font => {
+      const option = document.createElement('option');
+      option.value = font;
+      option.textContent = font;
+      fontList.appendChild(option);
+  });
+});

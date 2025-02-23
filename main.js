@@ -1,5 +1,6 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fontList = require('font-list');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -26,5 +27,15 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+ipcMain.handle('get-system-fonts', async () => {
+  try {
+    const fonts = await fontList.getFonts();
+    return fonts.map(font => font.replace(/"/g, ''));
+  } catch (error) {
+    console.error('Error fetching fonts:', error);
+    return [];
   }
 });
