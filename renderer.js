@@ -689,9 +689,9 @@ playSlides(slides);
       e.stopPropagation();
       lastClickedElement = element;
       // Show existing properties
-      fontInput.value = element.style.fontFamily || 'Arial';
+      fontInput.value = element.style.fontFamily;
       fontSizeInput.value = parseInt(element.style.fontSize);
-      colorInput.value = element.style.color || '#ffffff';
+      colorInput.value = element.style.color;
       // Open the pane
       bottomPane.classList.add('visible');
     }
