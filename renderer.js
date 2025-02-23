@@ -334,31 +334,50 @@ playSlides(slides);
 
   // Parse out the slides from the user’s code:
   function getSlidesArray(code) {
-    const match = code.match(/const\s+slides\s*=\s*\[([\s\S]*?)\];/);
+    // Use greedy matching to capture entire slides array
+    const match = code.match(/const\s+slides\s*=\s*\[([\s\S]*)\];/);
     if (!match) return [];
   
     const slidesContent = match[1].trim();
     let slides = [];
     let bracketCount = 0;
-    let startIndex = -1;
+    let currentSlide = [];
+    let inString = false;
   
     for (let i = 0; i < slidesContent.length; i++) {
-      if (slidesContent[i] === '{') {
-        if (bracketCount === 0) {
-          startIndex = i;
+      const char = slidesContent[i];
+      
+      // Handle string literals to ignore brackets inside strings
+      if (char === '"' || char === "'" || char === '`') {
+        inString = !inString;
+        currentSlide.push(char);
+        continue;
+      }
+  
+      if (!inString) {
+        if (char === '{') {
+          if (bracketCount === 0) currentSlide = [];
+          bracketCount++;
         }
-        bracketCount++;
-      } else if (slidesContent[i] === '}') {
-        bracketCount--;
-        if (bracketCount === 0 && startIndex >= 0) {
-          const slideCode = slidesContent.slice(startIndex, i + 1).trim();
-          slides.push(slideCode);
-          startIndex = -1;
+        else if (char === '}') {
+          bracketCount--;
         }
+      }
+  
+      currentSlide.push(char);
+  
+      if (bracketCount === 0 && char === '}') {
+        slides.push({
+          index: slides.length,
+          code: currentSlide.join('').trim()
+        });
+        currentSlide = [];
+        // Skip comma between slides
+        while (slidesContent[i + 1] === ',' || slidesContent[i + 1] === '\n') i++;
       }
     }
   
-    return slides.map((code, index) => ({ index, code }));
+    return slides;
   }
 
   // Capture slides from the original code
@@ -374,10 +393,15 @@ playSlides(slides);
 
   oneSlideTab.addEventListener('click', () => {
     showSingleSlide = true;
-    // If there's a current slide selected, show it; else just show the first
-    const slide = parsedSlides[currentSlideIndex] ? parsedSlides[currentSlideIndex].code : '';
-    // Wrap the slide snippet in parentheses so it is interpreted as an object literal expression.
-    editorInstance.setValue(`(${slide})`);
+    const currentCode = editorInstance.getValue();
+    const freshSlides = getSlidesArray(currentCode);
+    
+    if (freshSlides.length > currentSlideIndex) {
+      editorInstance.setValue(freshSlides[currentSlideIndex].code);
+    } else {
+      editorInstance.setValue('// Slide content not found');
+    }
+    
     oneSlideTab.classList.add('active');
     allSlidesTab.classList.remove('active');
   });
@@ -466,9 +490,15 @@ playSlides(slides);
         transitionInSlide(currentSlideIndex);
         updateSlidesThumbnails();
       
-        // If in single-slide mode, update editor content with proper wrapping
-        if (showSingleSlide && parsedSlides[index]) {
-          editorInstance.setValue(`(${parsedSlides[index].code})`);
+        if (showSingleSlide) {
+          const currentCode = editorInstance.getValue();
+          const freshSlides = getSlidesArray(currentCode);
+          
+          if (freshSlides.length > index) {
+            editorInstance.setValue(freshSlides[index].code);
+          } else {
+            editorInstance.setValue('// Slide content not found');
+          }
         }
       };
       slidesList.appendChild(thumbnail);
