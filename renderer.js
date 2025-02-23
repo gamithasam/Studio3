@@ -397,7 +397,7 @@ playSlides(slides);
     const freshSlides = getSlidesArray(currentCode);
     
     if (freshSlides.length > currentSlideIndex) {
-      editorInstance.setValue(freshSlides[currentSlideIndex].code);
+      editorInstance.setValue(`(${freshSlides[currentSlideIndex].code})`);
     } else {
       editorInstance.setValue('// Slide content not found');
     }
