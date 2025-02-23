@@ -173,6 +173,22 @@
     .hidden {
       display: none;
     }
+
+    .bottom-pane {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #252526;
+      border-top: 1px solid #333;
+      padding: 10px;
+      display: none; /* Collapsed by default */
+      flex-direction: column;
+      z-index: 2;
+    }
+    .bottom-pane.visible {
+      display: flex;
+    }
   </style>
 </head>
 <body>
@@ -206,6 +222,16 @@
     
     <div id="preview">
       <canvas id="threeCanvas"></canvas>
+      <!-- Add a bottom pane -->
+      <div class="bottom-pane" id="bottomPane">
+        <button id="closeBottomPane">Close</button>
+        <div id="propertyControls">
+          <!-- For example, controls for text style -->
+          Font: <input type="text" id="fontInput" value="Arial" />
+          Font Size: <input type="number" id="fontSizeInput" value="16" />
+          Color: <input type="text" id="colorInput" value="#ffffff" />
+        </div>
+      </div>
     </div>
   </div>
   

@@ -664,6 +664,83 @@ playSlides(slides);
     }, 1000);
   }
 
+  // Make overlay2D clickable:
+  overlay2D.style.pointerEvents = 'auto';
+
+  // New bottom pane logic
+  const bottomPane = document.getElementById('bottomPane');
+  const closeBottomPane = document.getElementById('closeBottomPane');
+  const fontInput = document.getElementById('fontInput');
+  const fontSizeInput = document.getElementById('fontSizeInput');
+  const colorInput = document.getElementById('colorInput');
+
+  closeBottomPane.addEventListener('click', () => {
+    bottomPane.classList.remove('visible');
+  });
+
+  // Track last clicked element for property updates
+  let lastClickedElement = null;
+
+  // Listen for clicks on 2D elements
+  overlay2D.addEventListener('click', (e) => {
+    const element = e.target;
+    // Example check: only show pane if a text element is clicked
+    if (element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'P') {
+      e.stopPropagation();
+      lastClickedElement = element;
+      // Show existing properties
+      fontInput.value = element.style.fontFamily || 'Arial';
+      fontSizeInput.value = parseInt(element.style.fontSize) || 16;
+      colorInput.value = element.style.color || '#ffffff';
+      // Open the pane
+      bottomPane.classList.add('visible');
+    }
+  });
+
+  // 1) Override document.createElement so H1/H2/P automatically get an ID
+  (function() {
+    const originalCreateElement = document.createElement;
+    let elementCounter = 0;
+
+    document.createElement = function(tagName) {
+      const element = originalCreateElement.call(document, tagName);
+      if (['H1', 'H2', 'P'].includes(tagName.toUpperCase())) {
+        element.id = `autoGenText_${elementCounter++}`;
+      }
+      return element;
+    };
+  })();
+
+  // Reflect property changes in real-time and update code
+  function updateElementProperties() {
+    if (!lastClickedElement) return;
+    lastClickedElement.style.fontFamily = fontInput.value;
+    lastClickedElement.style.fontSize = fontSizeInput.value + 'px';
+    lastClickedElement.style.color = colorInput.value;
+  
+    // Grab the auto-generated ID
+    const id = lastClickedElement.id;
+    if (!id) return;
+  
+    let code = editorInstance.getValue();
+  
+    // Use a quick find-and-replace. For example, find the style line for this ID
+    // (here searching for something like `element.style.cssText = '...'`)
+    // and replace it. You can adapt the pattern as needed.
+  
+    const regex = new RegExp(`(\\b${id}\\b.*?style\\.cssText\\s*=\\s*['"])([^'"]*)(['"])`, 's');
+    const newStyles = `color: ${colorInput.value}; font-family: ${fontInput.value}; font-size: ${fontSizeInput.value}px;`;
+    code = code.replace(regex, `$1${newStyles}$3`);
+  
+    // Update the editor with new code
+    editorInstance.setValue(code);
+  }
+
+  fontInput.addEventListener('input', updateElementProperties);
+  fontSizeInput.addEventListener('input', updateElementProperties);
+  colorInput.addEventListener('input', updateElementProperties);
+
+
   // Run the initial code automatically on load
   runUserCode(editorInstance.getValue());
 });
