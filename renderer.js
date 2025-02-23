@@ -512,30 +512,38 @@ playSlides(slides);
 
   function togglePlay() {
     isPlaying = !isPlaying;
-    playBtn.textContent = isPlaying ? '⏸ Pause' : '▶ Play';
     
     if (isPlaying) {
-      // Request full screen on the preview element when play is activated.
-      if (preview.requestFullscreen) {
-        preview.requestFullscreen();
-      } else if (preview.webkitRequestFullscreen) { /* Safari */
-        preview.webkitRequestFullscreen();
-      } else if (preview.msRequestFullscreen) { /* IE11 */
-        preview.msRequestFullscreen();
-      }
-      
-      // playInterval = setInterval(() => {
-      //   transitionOutSlide(currentSlideIndex);
-      //   currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
-      //   transitionInSlide(currentSlideIndex);
-      //   updateSlidesThumbnails();
-      // }, 3000); // Change slide every 3 seconds
+        // Reset to first slide
+        if (currentSlideIndex !== 0) {
+            transitionOutSlide(currentSlideIndex);
+            currentSlideIndex = 0;
+            transitionInSlide(currentSlideIndex);
+            updateSlidesThumbnails();
+        }
+        
+        // Enter fullscreen
+        if (preview.requestFullscreen) {
+            preview.requestFullscreen();
+        } else if (preview.webkitRequestFullscreen) {
+            preview.webkitRequestFullscreen();
+        } else if (preview.msRequestFullscreen) {
+            preview.msRequestFullscreen();
+        }
+        
+        // Start automatic slide progression
+        // playInterval = setInterval(() => {
+        //     transitionOutSlide(currentSlideIndex);
+        //     currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
+        //     transitionInSlide(currentSlideIndex);
+        //     updateSlidesThumbnails();
+        // }, 3000); // Change slide every 3 seconds
     } else {
-      // Exit full screen if currently in full screen mode.
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      }
-      clearInterval(playInterval);
+        // Exit fullscreen
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        }
+        clearInterval(playInterval);
     }
   }
 
@@ -547,7 +555,6 @@ playSlides(slides);
         // Stop slide playback and update play button text when exiting full screen.
         clearInterval(playInterval);
         isPlaying = false;
-        playBtn.textContent = '▶ Play';
       }
     } else if (e.key === 'Enter') {
       // Run/re-run the code when Enter is pressed
