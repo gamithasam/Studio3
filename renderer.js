@@ -327,7 +327,7 @@ playSlides(slides);
   document.getElementById('preview').appendChild(overlay2D);
 
   // Store the original code and set up tab elements
-  const originalCode = editorInstance.getValue();
+  let originalCode = editorInstance.getValue();
   const allSlidesTab = document.getElementById('allSlidesTab');
   const oneSlideTab = document.getElementById('oneSlideTab');
   let showSingleSlide = false;
@@ -380,11 +380,32 @@ playSlides(slides);
     return slides;
   }
 
-  // Capture slides from the original code
-  const parsedSlides = getSlidesArray(originalCode);
+  // Add this helper function to merge one-slide updates into the overall code
+  function mergeOneSlideChanges() {
+    let oneSlideCode = editorInstance.getValue();
+    // Remove surrounding parentheses if present
+    if (oneSlideCode.startsWith('(') && oneSlideCode.endsWith(')')) {
+      oneSlideCode = oneSlideCode.slice(1, -1);
+    }
+    let freshSlides = getSlidesArray(originalCode);
+    if (freshSlides.length > currentSlideIndex) {
+      freshSlides[currentSlideIndex].code = oneSlideCode;
+    }
+    // Rebuild the slides array content
+    const rebuiltSlides = freshSlides.map(sl => sl.code).join(',\n');
+    // Replace the original slides array with the updated content
+    originalCode = originalCode.replace(
+      /(const\s+slides\s*=\s*\[)[\s\S]*(\];)/,
+      `$1\n${rebuiltSlides}\n$2`
+    );
+  }
 
   // Toggle tabs
   allSlidesTab.addEventListener('click', () => {
+    if (showSingleSlide) {
+      // Merge any one-slide changes into the overall code before switching
+      mergeOneSlideChanges();
+    }
     showSingleSlide = false;
     editorInstance.setValue(originalCode);
     allSlidesTab.classList.add('active');
@@ -392,16 +413,17 @@ playSlides(slides);
   });
 
   oneSlideTab.addEventListener('click', () => {
+    if (!showSingleSlide) {
+      // Merge changes if coming from all slides mode (optional)
+      mergeOneSlideChanges();
+    }
     showSingleSlide = true;
-    const currentCode = editorInstance.getValue();
-    const freshSlides = getSlidesArray(currentCode);
-    
+    const freshSlides = getSlidesArray(originalCode);
     if (freshSlides.length > currentSlideIndex) {
       editorInstance.setValue(`(${freshSlides[currentSlideIndex].code})`);
     } else {
       editorInstance.setValue('// Slide content not found');
     }
-    
     oneSlideTab.classList.add('active');
     allSlidesTab.classList.remove('active');
   });
@@ -489,13 +511,13 @@ playSlides(slides);
         currentSlideIndex = index;
         transitionInSlide(currentSlideIndex);
         updateSlidesThumbnails();
-      
+
         if (showSingleSlide) {
           const currentCode = editorInstance.getValue();
           const freshSlides = getSlidesArray(currentCode);
           
           if (freshSlides.length > index) {
-            editorInstance.setValue(freshSlides[index].code);
+            editorInstance.setValue(`(${freshSlides[currentSlideIndex].code})`);
           } else {
             editorInstance.setValue('// Slide content not found');
           }
@@ -612,6 +634,9 @@ playSlides(slides);
     if (isPlaying) {
       togglePlay();
     }
+
+    // Update the master copy to the current editor code
+    originalCode = code;
     
     // Clear both 3D scene and 2D overlay
     while (scene.children.length > 0) {
