@@ -723,10 +723,24 @@ function rgbToHex(rgb) {
   // Reflect property changes in real-time and update code
   function updateElementProperties() {
     if (!lastClickedElement) return;
-    lastClickedElement.style.fontFamily = fontInput.value;
-    lastClickedElement.style.fontSize = fontSizeInput.value + 'px';
-    lastClickedElement.style.color = colorInput.value;
-  }
+    
+    const newColor = document.getElementById('colorInput').value;
+    const newFontFamily = fontInput.value;
+    const newFontSize = fontSizeInput.value + 'px';
+
+    // Only update if values are valid
+    if (newFontFamily) {
+        lastClickedElement.style.fontFamily = newFontFamily;
+    }
+    
+    if (parseInt(fontSizeInput.value) > 0) {
+        lastClickedElement.style.fontSize = newFontSize;
+    }
+    
+    if (/^#[0-9A-F]{6}$/i.test(newColor)) {
+        lastClickedElement.style.color = newColor;
+    }
+}
 
   fontInput.addEventListener('input', updateElementProperties);
   fontSizeInput.addEventListener('input', updateElementProperties);
@@ -734,13 +748,17 @@ function rgbToHex(rgb) {
 
   // Handle color picker input
   document.getElementById('colorPicker').addEventListener('input', (e) => {
-    document.getElementById('colorInput').value = e.target.value;
+    const newColor = e.target.value;
+    document.getElementById('colorInput').value = newColor;
+    updateElementProperties(); // Trigger the update immediately
   });
-  
+
   document.getElementById('colorInput').addEventListener('input', (e) => {
-    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
-      document.getElementById('colorPicker').value = e.target.value;
-    }
+      const newColor = e.target.value;
+      if (/^#[0-9A-F]{6}$/i.test(newColor)) {
+          document.getElementById('colorPicker').value = newColor;
+          updateElementProperties(); // Trigger the update when valid hex color is entered
+      }
   });
 
   // Run the initial code automatically on load
