@@ -677,6 +677,10 @@ playSlides(slides);
 
   closeBottomPane.addEventListener('click', () => {
     bottomPane.classList.remove('visible');
+    if (lastClickedElement) {
+        lastClickedElement.classList.remove('selected-element');
+        lastClickedElement = null;
+    }
   });
 
   // Track last clicked element for property updates
@@ -692,7 +696,14 @@ playSlides(slides);
         // Check if the clicked element belongs to the current slide
         const slideContainer = element.closest('[data-slide-container]');
         if (slideContainer && slideContainer === slideData[currentSlideIndex]._container) {
+            // Remove highlight from previously selected element, if any
+            if (lastClickedElement) {
+                lastClickedElement.classList.remove('selected-element');
+            }
+            // Set and highlight the currently clicked element
             lastClickedElement = element;
+            lastClickedElement.classList.add('selected-element');
+
             // Show existing properties
             fontInput.value = window.getComputedStyle(element).fontFamily.replace(/['"]/g, '');
             fontSizeInput.value = parseInt(window.getComputedStyle(element).fontSize);
@@ -702,7 +713,18 @@ playSlides(slides);
             bottomPane.classList.add('visible');
         }
     }
-});
+  });
+
+  document.addEventListener('click', (e) => {
+    // If the clicked element is not a text element (or within bottomPane), deselect the element.
+    if (!e.target.closest('h1, h2, p') && !e.target.closest('#bottomPane')) {
+        if (lastClickedElement) {
+            lastClickedElement.classList.remove('selected-element');
+            lastClickedElement = null;
+        }
+        bottomPane.classList.remove('visible');
+    }
+  });
 
 // Add this helper function to convert RGB to Hex
 function rgbToHex(rgb) {

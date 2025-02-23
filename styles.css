@@ -297,3 +297,9 @@ datalist option {
 datalist option:hover {
       background: #0078d4;
 }
+
+.selected-element {
+    outline: 2px solid #2684FF;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px rgba(38, 132, 255, 0.2);
+}
