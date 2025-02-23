@@ -181,13 +181,90 @@
       width: 100%;
       background: #252526;
       border-top: 1px solid #333;
-      padding: 10px;
-      display: none; /* Collapsed by default */
+      padding: 16px;
+      display: none;
       flex-direction: column;
+      gap: 16px;
       z-index: 2;
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
     }
+
     .bottom-pane.visible {
       display: flex;
+    }
+
+    #closeBottomPane {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      background: transparent;
+      border: none;
+      color: #888;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    #closeBottomPane:hover {
+      color: #fff;
+      background: #333;
+    }
+
+    #propertyControls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      align-items: center;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .control-group input[type="text"],
+    .control-group input[type="number"] {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .control-group input[type="color"] {
+      -webkit-appearance: none;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 4px;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .control-group input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .control-group input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 4px;
+    }
+
+    .color-with-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .color-with-text input[type="text"] {
+      flex: 1;
     }
   </style>
 </head>
@@ -224,12 +301,42 @@
       <canvas id="threeCanvas"></canvas>
       <!-- Add a bottom pane -->
       <div class="bottom-pane" id="bottomPane">
-        <button id="closeBottomPane">Close</button>
+        <button id="closeBottomPane">×</button>
         <div id="propertyControls">
-          <!-- For example, controls for text style -->
-          Font: <input type="text" id="fontInput" value="Arial" />
-          Font Size: <input type="number" id="fontSizeInput" value="16" />
-          Color: <input type="text" id="colorInput" value="#ffffff" />
+          <div class="control-group">
+            <label for="fontInput">Font Family</label>
+            <input type="text" id="fontInput" value="Arial" list="fontList" />
+            <datalist id="fontList">
+              <option value="Arial">
+              <option value="Helvetica">
+              <option value="Times New Roman">
+              <option value="Georgia">
+              <option value="Courier New">
+              <option value="Monaco">
+            </datalist>
+          </div>
+          
+          <div class="control-group">
+            <label for="fontSizeInput">Font Size (px)</label>
+            <input type="number" id="fontSizeInput" value="16" min="8" max="200" />
+          </div>
+          
+          <div class="control-group">
+            <label for="colorInput">Text Color</label>
+            <div class="color-with-text">
+              <input type="color" id="colorPicker" value="#ffffff" />
+              <input type="text" id="colorInput" value="#ffffff" />
+            </div>
+          </div>
+          
+          <div class="control-group">
+            <label for="fontWeightInput">Font Weight</label>
+            <select id="fontWeightInput" class="select-input">
+              <option value="normal">Normal</option>
+              <option value="bold">Bold</option>
+              <option value="lighter">Light</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>

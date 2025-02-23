@@ -610,6 +610,7 @@ playSlides(slides);
     slidesArray.forEach((slide, idx) => {
       // Create a container for this slide's 2D content
       const slideContainer = document.createElement('div');
+      slideContainer.setAttribute('data-slide-container', `slide-${idx}`);
       slideContainer.style.cssText = `
         display: none;
         width: 100%;
@@ -686,16 +687,38 @@ playSlides(slides);
     const element = e.target;
     // Example check: only show pane if a text element is clicked
     if (element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'P') {
-      e.stopPropagation();
-      lastClickedElement = element;
-      // Show existing properties
-      fontInput.value = element.style.fontFamily;
-      fontSizeInput.value = parseInt(element.style.fontSize);
-      colorInput.value = element.style.color;
-      // Open the pane
-      bottomPane.classList.add('visible');
+        e.stopPropagation();
+        
+        // Check if the clicked element belongs to the current slide
+        const slideContainer = element.closest('[data-slide-container]');
+        if (slideContainer && slideContainer === slideData[currentSlideIndex]._container) {
+            lastClickedElement = element;
+            // Show existing properties
+            fontInput.value = window.getComputedStyle(element).fontFamily.replace(/['"]/g, '');
+            fontSizeInput.value = parseInt(window.getComputedStyle(element).fontSize);
+            colorInput.value = rgbToHex(window.getComputedStyle(element).color);
+            colorPicker.value = rgbToHex(window.getComputedStyle(element).color);
+            // Open the pane
+            bottomPane.classList.add('visible');
+        }
     }
-  });
+});
+
+// Add this helper function to convert RGB to Hex
+function rgbToHex(rgb) {
+    // If it's already a hex value, return it
+    if (rgb.startsWith('#')) return rgb;
+    
+    // Extract RGB values
+    const rgbValues = rgb.match(/\d+/g);
+    if (!rgbValues) return '#ffffff';
+    
+    const r = parseInt(rgbValues[0]);
+    const g = parseInt(rgbValues[1]);
+    const b = parseInt(rgbValues[2]);
+    
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
 
   // Reflect property changes in real-time and update code
   function updateElementProperties() {
@@ -709,6 +732,16 @@ playSlides(slides);
   fontSizeInput.addEventListener('input', updateElementProperties);
   colorInput.addEventListener('input', updateElementProperties);
 
+  // Handle color picker input
+  document.getElementById('colorPicker').addEventListener('input', (e) => {
+    document.getElementById('colorInput').value = e.target.value;
+  });
+  
+  document.getElementById('colorInput').addEventListener('input', (e) => {
+    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+      document.getElementById('colorPicker').value = e.target.value;
+    }
+  });
 
   // Run the initial code automatically on load
   runUserCode(editorInstance.getValue());
