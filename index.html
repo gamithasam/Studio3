@@ -178,7 +178,7 @@
       position: absolute;
       bottom: 0;
       left: 0;
-      width: 100%;
+      width: calc(100% - 32px); /* Subtract padding from width */
       background: #252526;
       border-top: 1px solid #333;
       padding: 16px;
@@ -212,15 +212,18 @@
 
     #propertyControls {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      align-items: center;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Reduced minimum width */
+      gap: 24px; /* Increased gap */
+      align-items: start;
+      max-width: 100%;
+      overflow-x: hidden;
     }
 
     .control-group {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      min-width: 0; /* Allows content to shrink below min-width */
     }
 
     .control-group label {
@@ -261,10 +264,24 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      min-width: 0; /* Allows content to shrink below min-width */
     }
 
     .color-with-text input[type="text"] {
       flex: 1;
+      min-width: 0; /* Allows input to shrink */
+      width: calc(100% - 48px); /* Account for color picker width */
+    }
+
+    /* Add styles for the select input */
+    .select-input {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      width: 100%;
     }
   </style>
 </head>
