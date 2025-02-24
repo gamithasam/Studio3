@@ -413,10 +413,11 @@ playSlides(slides);
   });
 
   oneSlideTab.addEventListener('click', () => {
+    // If we're coming from "all slides" mode, update the master code.
     if (!showSingleSlide) {
-      // Merge changes if coming from all slides mode (optional)
-      // mergeOneSlideChanges();
+      originalCode = editorInstance.getValue();
     }
+    
     showSingleSlide = true;
     const freshSlides = getSlidesArray(originalCode);
     if (freshSlides.length > currentSlideIndex) {
