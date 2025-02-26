@@ -758,40 +758,108 @@ playSlides(slides);
     
     const slideIndex = parseInt(slideContainer.getAttribute('data-slide-container').replace('slide-', ''));
     
-    // Get element's content as an additional identifier
+    // Get element's content and tag as identifiers
     const textContent = element.textContent.trim();
+    const tagName = element.tagName.toLowerCase();
     
     return { 
       slideIndex, 
       element,
-      tagName: element.tagName.toLowerCase(),
-      textContent: textContent.substring(0, 20) // First 20 chars for identification
+      tagName,
+      textContent: textContent.substring(0, 30), // First 30 chars for identification
+      innerHTML: element.innerHTML
     };
   }
 
-  // Find the right variable name for the element in the slide code
+  // Find the right variable name or HTML pattern for the element in the slide code
   function findElementVariableInCode(slideCode, elementInfo) {
     if (!elementInfo) return null;
     
-    const { element, tagName, textContent } = elementInfo;
+    const { tagName, textContent } = elementInfo;
     
-    // First try to find variables in the return statement
+    // Check for elements that might be created via innerHTML
+    if (slideCode.includes('innerHTML') || slideCode.includes('insertAdjacentHTML')) {
+      // Find potential container variables that might contain our element
+      const containerVars = [];
+      const containerRegex = /const\s+(\w+)\s*=\s*document\.createElement\(['"]div['"]\)/g;
+      let match;
+      while ((match = containerRegex.exec(slideCode)) !== null) {
+        containerVars.push(match[1]);
+      }
+      
+      // Check if any container's innerHTML contains our element
+      for (const container of containerVars) {
+        // Look for innerHTML assignments
+        const htmlRegex = new RegExp(`${container}\\.innerHTML\\s*=\\s*[\`'"]([\\s\\S]*?)[\`'"]`, 'g');
+        const htmlMatch = htmlRegex.exec(slideCode);
+        
+        if (htmlMatch && htmlMatch[1]) {
+          const htmlContent = htmlMatch[1];
+          
+          // Check if our element's tag and some content appear in this HTML
+          if (htmlContent.includes(`<${tagName}`) && 
+              (textContent.length === 0 || htmlContent.includes(textContent.substring(0, Math.min(10, textContent.length))))) {
+            
+            // First check if the element is referenced later via querySelector
+            const querySelectorRegex = new RegExp(
+              `(\\w+)\\s*:\\s*${container}\\.querySelector\\(['"]${tagName}['"]\\)`, 'g'
+            );
+            const querySelectorMatch = querySelectorRegex.exec(slideCode);
+            
+            if (querySelectorMatch) {
+              // Return the variable name used in the return object
+              return {
+                type: 'querySelector',
+                containerVar: container,
+                elementVar: querySelectorMatch[1],
+                htmlContent: htmlContent
+              };
+            }
+            
+            // For elements that might be part of a querySelectorAll
+            if (tagName === 'li') {
+              const querySelectorAllRegex = new RegExp(
+                `(\\w+)\\s*:\\s*Array\\.from\\(${container}\\.querySelectorAll\\(['"]li['"]\\)\\)`, 'g'
+              );
+              const querySelectorAllMatch = querySelectorAllRegex.exec(slideCode);
+              
+              if (querySelectorAllMatch) {
+                return {
+                  type: 'querySelectorAll',
+                  containerVar: container,
+                  elementVar: querySelectorAllMatch[1],
+                  htmlContent: htmlContent
+                };
+              }
+            }
+            
+            // If no querySelector reference, just reference the HTML directly
+            return {
+              type: 'innerHTML',
+              containerVar: container,
+              htmlContent: htmlContent
+            };
+          }
+        }
+      }
+    }
+    
+    // Try to find it in the return object for directly created elements
     const returnMatch = slideCode.match(/return\s*{([^}]*)}/);
     if (returnMatch) {
       const returnVars = returnMatch[1]
         .split(',')
         .map(v => v.trim())
-        .filter(v => v.length > 0); // Filter out empty entries
+        .filter(v => v.length > 0);
       
-      // Map of common variable names by tag type
+      // Potential variable names based on tag type
       const tagNameMap = {
         'h1': ['title', 'heading', 'mainTitle'],
-        'h2': ['subtitle', 'subheading', 'author'],
+        'h2': ['subtitle', 'subheading', 'author', 'title'],
         'p': ['description', 'text', 'paragraph'],
         'li': ['item', 'listItem']
       };
       
-      // Try to find a variable that could represent our element
       const possibleNames = tagNameMap[tagName] || [];
       
       for (const varDef of returnVars) {
@@ -800,45 +868,24 @@ playSlides(slides);
         
         const varName = parts[0].trim();
         
-        // If we can find text content in the code near the variable declaration,
-        // that's a strong indicator this is our variable
+        // Match by content assignment
         if (textContent && slideCode.includes(`${varName}.textContent = '${textContent}'`) || 
-            slideCode.includes(`${varName}.textContent = "${textContent}"`) ||
-            slideCode.includes(`${varName}.innerText = '${textContent}'`) ||
-            slideCode.includes(`${varName}.innerText = "${textContent}"`)) {
-          return varName;
+            slideCode.includes(`${varName}.textContent = "${textContent}"`)) {
+          return { type: 'direct', elementVar: varName };
         }
         
-        // Check if the variable name matches our expected names for this tag
+        // Match by common variable names
         if (possibleNames.some(name => varName === name)) {
-          return varName;
+          return { type: 'direct', elementVar: varName };
         }
       }
     }
     
-    // Look for variable declarations for this element type
-    const varDeclarations = slideCode.match(new RegExp(`const\\s+(\\w+)\\s*=\\s*document\\.createElement\\(['"](${tagName})['"]*\\)`, 'g'));
-    
-    if (varDeclarations && varDeclarations.length) {
-      // Find the most likely variable
-      for (const declaration of varDeclarations) {
-        const varNameMatch = declaration.match(/const\s+(\w+)\s*=/);
-        if (varNameMatch && varNameMatch[1]) {
-          const varName = varNameMatch[1];
-          
-          // If we can find the text content assignment for this variable, it's likely our element
-          if (textContent && slideCode.includes(`${varName}.textContent = '${textContent}'`) || 
-              slideCode.includes(`${varName}.textContent = "${textContent}"`)) {
-            return varName;
-          }
-        }
-      }
-      
-      // If we couldn't match by content, return the first match
-      const firstMatch = varDeclarations[0].match(/const\s+(\w+)\s*=/);
-      if (firstMatch && firstMatch[1]) {
-        return firstMatch[1];
-      }
+    // Look for direct variable declarations
+    const varDeclarationRegex = new RegExp(`const\\s+(\\w+)\\s*=\\s*document\\.createElement\\(['"]${tagName}['"]\\)`, 'g');
+    const varMatch = varDeclarationRegex.exec(slideCode);
+    if (varMatch) {
+      return { type: 'direct', elementVar: varMatch[1] };
     }
     
     return null;
@@ -854,111 +901,78 @@ playSlides(slides);
     
     if (!slideCode) return;
     
-    const elementVar = findElementVariableInCode(slideCode, elementInfo);
-    if (!elementVar) {
-      console.warn('Could not find element variable in code:', elementInfo);
-      return;
-    }
-    
-    console.log(`Updating style for element: ${elementVar} in slide ${slideIndex+1}`);
+    console.log(`Updating style for ${tagName} with content "${textContent}" in slide ${slideIndex+1}`);
     
     let updatedSlideCode = slideCode;
     let codeWasUpdated = false;
     
-    // Strategy 1: Update inline style.property = 'value';
-    for (const [styleProp, styleValue] of Object.entries(styleChanges)) {
-      const camelCaseProp = styleProp.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+    // SIMPLIFIED APPROACH: Directly look for innerHTML containing our element 
+    if (tagName) {
+      // First, try to find innerHTML assignments that might contain our element
+      const innerHTMLRegex = /(\w+)\.innerHTML\s*=\s*(`|'|")([\s\S]*?)\2/g;
+      let match;
       
-      // Look for exact property setting pattern, being very careful with matching
-      const inlineStyleRegex = new RegExp(
-        `(${elementVar}\\.style\\.${camelCaseProp}\\s*=\\s*['"'])([^'"]*?)(['"])`, 
-        'g'
-      );
-      
-      const match = inlineStyleRegex.exec(updatedSlideCode);
-      if (match) {
-        updatedSlideCode = updatedSlideCode.replace(
-          match[0],
-          `${match[1]}${styleValue}${match[3]}`
-        );
-        codeWasUpdated = true;
-        console.log(`- Updated inline style: ${camelCaseProp} = ${styleValue}`);
-      }
-    }
-    
-    // Strategy 2: Update style.cssText = '...'
-    const cssTextRegex = new RegExp(`(${elementVar}\\.style\\.cssText\\s*=\\s*['"\`])([\\s\\S]*?)(['"\`])`, 'g');
-    const cssTextMatch = cssTextRegex.exec(updatedSlideCode);
-    
-    if (cssTextMatch) {
-      let cssText = cssTextMatch[2];
-      let cssTextUpdated = false;
-      
-      for (const [styleProp, styleValue] of Object.entries(styleChanges)) {
-        // Look for existing property in cssText
-        const propRegex = new RegExp(`(${styleProp})\\s*:\\s*([^;]*?)(;|$)`, 'g');
-        const propMatch = propRegex.exec(cssText);
+      while ((match = innerHTMLRegex.exec(slideCode)) !== null) {
+        const containerVar = match[1];
+        const quoteType = match[2];
+        let htmlContent = match[3];
         
-        if (propMatch) {
-          // Replace existing property value
-          cssText = cssText.replace(propMatch[0], `${styleProp}: ${styleValue}${propMatch[3]}`);
-          cssTextUpdated = true;
-        } else {
-          // Add new property to cssText
-          cssText += `${cssText.endsWith(';') ? ' ' : '; '}${styleProp}: ${styleValue};`;
-          cssTextUpdated = true;
-        }
-      }
-      
-      if (cssTextUpdated) {
-        updatedSlideCode = updatedSlideCode.replace(
-          cssTextMatch[0],
-          `${cssTextMatch[1]}${cssText}${cssTextMatch[3]}`
-        );
-        codeWasUpdated = true;
-        console.log(`- Updated cssText with new styles`);
-      }
-    }
-    
-    // Strategy 3: Update innerHTML with style attributes
-    // Only attempt this if the element might be created directly in HTML strings
-    if (textContent && tagName) {
-      const htmlContentRegex = new RegExp(
-        `(innerHTML\\s*=\\s*['"\`][\\s\\S]*?<${tagName}[^>]*?)` +
-        `(style\\s*=\\s*["'])([^"']*?)(['"][^>]*?>[\\s\\S]*?${textContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?)` +
-        `(</${tagName}>)`,
-        'gi'
-      );
-      
-      let htmlMatch;
-      while ((htmlMatch = htmlContentRegex.exec(updatedSlideCode)) !== null) {
-        let styleAttr = htmlMatch[3];
-        let styleUpdated = false;
+        console.log(`Found innerHTML in ${containerVar}`);
         
-        for (const [styleProp, styleValue] of Object.entries(styleChanges)) {
-          // Look for existing property in style attribute
-          const propRegex = new RegExp(`(${styleProp})\\s*:\\s*([^;]*?)(;|$)`, 'g');
-          const propMatch = propRegex.exec(styleAttr);
+        // Look for our element in the HTML content
+        // Create a pattern that matches our tag with a style attribute
+        const elementPattern = new RegExp(
+          `(<${tagName}[^>]*?)(style=["']([^"']*)["'])([^>]*?>)([\\s\\S]*?)</${tagName}>`, 
+          'g'
+        );
+        
+        let elementMatch;
+        let updatedHtmlContent = htmlContent;
+        
+        while ((elementMatch = elementPattern.exec(htmlContent)) !== null) {
+          // Check if this is our element by comparing content
+          const elementContent = elementMatch[5].trim();
           
-          if (propMatch) {
-            // Replace existing property value
-            styleAttr = styleAttr.replace(propMatch[0], `${styleProp}: ${styleValue}${propMatch[3]}`);
-            styleUpdated = true;
-          } else {
-            // Add new property to style attribute
-            styleAttr += `${styleAttr.endsWith(';') ? ' ' : '; '}${styleProp}: ${styleValue};`;
-            styleUpdated = true;
+          if (!textContent || elementContent.includes(textContent.substring(0, Math.min(10, textContent.length)))) {
+            console.log(`Found matching ${tagName} with content: "${elementContent}"`);
+            
+            // Extract current style
+            let styleAttr = elementMatch[3];
+            let styleUpdated = false;
+            
+            for (const [styleProp, styleValue] of Object.entries(styleChanges)) {
+              console.log(`Updating ${styleProp} to ${styleValue}`);
+              // Look for existing property in style attribute
+              const propRegex = new RegExp(`(${styleProp})\\s*:\\s*([^;]*?)(;|$)`, 'g');
+              const propMatch = propRegex.exec(styleAttr);
+              
+              if (propMatch) {
+                // Replace existing property value
+                styleAttr = styleAttr.replace(propRegex, `$1: ${styleValue}$3`);
+                styleUpdated = true;
+              } else {
+                // Add new property to style attribute
+                styleAttr += `${styleAttr.endsWith(';') ? ' ' : '; '}${styleProp}: ${styleValue};`;
+                styleUpdated = true;
+              }
+            }
+            
+            if (styleUpdated) {
+              // Replace the style attribute with updated one
+              const updatedElement = `${elementMatch[1]}style="${styleAttr}"${elementMatch[4]}${elementMatch[5]}</${tagName}>`;
+              updatedHtmlContent = updatedHtmlContent.replace(elementMatch[0], updatedElement);
+            }
           }
         }
         
-        if (styleUpdated) {
-          // Replace the style attribute with updated one
-          updatedSlideCode = updatedSlideCode.replace(
-            htmlMatch[0],
-            `${htmlMatch[1]}style="${styleAttr}"${htmlMatch[4]}${htmlMatch[5]}`
-          );
+        if (updatedHtmlContent !== htmlContent) {
+          // Update the innerHTML in code
+          const fullMatch = `${containerVar}.innerHTML = ${quoteType}${htmlContent}${quoteType}`;
+          const replacement = `${containerVar}.innerHTML = ${quoteType}${updatedHtmlContent}${quoteType}`;
+          
+          updatedSlideCode = updatedSlideCode.replace(fullMatch, replacement);
           codeWasUpdated = true;
-          console.log(`- Updated HTML style attribute`);
+          console.log(`- Updated HTML style attribute in ${containerVar}.innerHTML`);
         }
       }
     }
@@ -981,7 +995,15 @@ playSlides(slides);
       
       console.log('Code updated successfully!');
     } else {
-      console.warn('Could not locate style patterns to update for', elementVar);
+      console.warn('No code updates were made. Could not find matching pattern.');
+      
+      // Additional debug information
+      console.log('Element info:', JSON.stringify({
+        slideIndex,
+        tagName,
+        textContent: textContent?.substring(0, 30),
+      }));
+      console.log('Style changes:', styleChanges);
     }
   }
 
