@@ -1,6 +1,12 @@
 // This file sets up the Monaco Editor in the left pane and Three.js with GSAP on the right pane.
 // The user code is executed on pressing Enter or clicking Play.
 
+import { Water } from 'three/addons/objects/Water.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+
+window.Water = Water;
+window.Sky = Sky;
+
 require.config({ paths: { 'vs': './vs' } });
 
 require(['vs/editor/editor.main'], function(monaco) {
