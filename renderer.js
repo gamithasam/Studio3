@@ -338,7 +338,7 @@ playSlides(slides);
   const oneSlideTab = document.getElementById('oneSlideTab');
   let showSingleSlide = false;
 
-  // Parse out the slides from the user’s code:
+  // Parse out the slides from the user's code:
   function getSlidesArray(code) {
     // Use greedy matching to capture entire slides array
     const match = code.match(/const\s+slides\s*=\s*\[([\s\S]*)\];/);
@@ -735,6 +735,7 @@ playSlides(slides);
   const fontInput = document.getElementById('fontInput');
   const fontSizeInput = document.getElementById('fontSizeInput');
   const colorInput = document.getElementById('colorInput');
+  const fontWeightInput = document.getElementById('fontWeightInput');
 
   closeBottomPane.addEventListener('click', () => {
     bottomPane.classList.remove('visible');
@@ -746,12 +747,249 @@ playSlides(slides);
 
   // Track last clicked element for property updates
   let lastClickedElement = null;
+  // Store element metadata for code updates
+  let elementMetadata = null;
+
+  // Get a unique path for an element in the DOM
+  function getElementPath(element) {
+    // Find which slide container this element belongs to
+    const slideContainer = element.closest('[data-slide-container]');
+    if (!slideContainer) return null;
+    
+    const slideIndex = parseInt(slideContainer.getAttribute('data-slide-container').replace('slide-', ''));
+    
+    // Get element's content as an additional identifier
+    const textContent = element.textContent.trim();
+    
+    return { 
+      slideIndex, 
+      element,
+      tagName: element.tagName.toLowerCase(),
+      textContent: textContent.substring(0, 20) // First 20 chars for identification
+    };
+  }
+
+  // Find the right variable name for the element in the slide code
+  function findElementVariableInCode(slideCode, elementInfo) {
+    if (!elementInfo) return null;
+    
+    const { element, tagName, textContent } = elementInfo;
+    
+    // First try to find variables in the return statement
+    const returnMatch = slideCode.match(/return\s*{([^}]*)}/);
+    if (returnMatch) {
+      const returnVars = returnMatch[1]
+        .split(',')
+        .map(v => v.trim())
+        .filter(v => v.length > 0); // Filter out empty entries
+      
+      // Map of common variable names by tag type
+      const tagNameMap = {
+        'h1': ['title', 'heading', 'mainTitle'],
+        'h2': ['subtitle', 'subheading', 'author'],
+        'p': ['description', 'text', 'paragraph'],
+        'li': ['item', 'listItem']
+      };
+      
+      // Try to find a variable that could represent our element
+      const possibleNames = tagNameMap[tagName] || [];
+      
+      for (const varDef of returnVars) {
+        const parts = varDef.split(':');
+        if (parts.length !== 2) continue;
+        
+        const varName = parts[0].trim();
+        
+        // If we can find text content in the code near the variable declaration,
+        // that's a strong indicator this is our variable
+        if (textContent && slideCode.includes(`${varName}.textContent = '${textContent}'`) || 
+            slideCode.includes(`${varName}.textContent = "${textContent}"`) ||
+            slideCode.includes(`${varName}.innerText = '${textContent}'`) ||
+            slideCode.includes(`${varName}.innerText = "${textContent}"`)) {
+          return varName;
+        }
+        
+        // Check if the variable name matches our expected names for this tag
+        if (possibleNames.some(name => varName === name)) {
+          return varName;
+        }
+      }
+    }
+    
+    // Look for variable declarations for this element type
+    const varDeclarations = slideCode.match(new RegExp(`const\\s+(\\w+)\\s*=\\s*document\\.createElement\\(['"](${tagName})['"]*\\)`, 'g'));
+    
+    if (varDeclarations && varDeclarations.length) {
+      // Find the most likely variable
+      for (const declaration of varDeclarations) {
+        const varNameMatch = declaration.match(/const\s+(\w+)\s*=/);
+        if (varNameMatch && varNameMatch[1]) {
+          const varName = varNameMatch[1];
+          
+          // If we can find the text content assignment for this variable, it's likely our element
+          if (textContent && slideCode.includes(`${varName}.textContent = '${textContent}'`) || 
+              slideCode.includes(`${varName}.textContent = "${textContent}"`)) {
+            return varName;
+          }
+        }
+      }
+      
+      // If we couldn't match by content, return the first match
+      const firstMatch = varDeclarations[0].match(/const\s+(\w+)\s*=/);
+      if (firstMatch && firstMatch[1]) {
+        return firstMatch[1];
+      }
+    }
+    
+    return null;
+  }
+
+  // Update the code based on element style changes
+  function updateCodeWithStyleChanges(elementInfo, styleChanges) {
+    if (!elementInfo) return;
+    
+    const { slideIndex, tagName, textContent } = elementInfo;
+    const slides = getSlidesArray(originalCode);
+    const slideCode = slides[slideIndex]?.code;
+    
+    if (!slideCode) return;
+    
+    const elementVar = findElementVariableInCode(slideCode, elementInfo);
+    if (!elementVar) {
+      console.warn('Could not find element variable in code:', elementInfo);
+      return;
+    }
+    
+    console.log(`Updating style for element: ${elementVar} in slide ${slideIndex+1}`);
+    
+    let updatedSlideCode = slideCode;
+    let codeWasUpdated = false;
+    
+    // Strategy 1: Update inline style.property = 'value';
+    for (const [styleProp, styleValue] of Object.entries(styleChanges)) {
+      const camelCaseProp = styleProp.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+      
+      // Look for exact property setting pattern, being very careful with matching
+      const inlineStyleRegex = new RegExp(
+        `(${elementVar}\\.style\\.${camelCaseProp}\\s*=\\s*['"'])([^'"]*?)(['"])`, 
+        'g'
+      );
+      
+      const match = inlineStyleRegex.exec(updatedSlideCode);
+      if (match) {
+        updatedSlideCode = updatedSlideCode.replace(
+          match[0],
+          `${match[1]}${styleValue}${match[3]}`
+        );
+        codeWasUpdated = true;
+        console.log(`- Updated inline style: ${camelCaseProp} = ${styleValue}`);
+      }
+    }
+    
+    // Strategy 2: Update style.cssText = '...'
+    const cssTextRegex = new RegExp(`(${elementVar}\\.style\\.cssText\\s*=\\s*['"\`])([\\s\\S]*?)(['"\`])`, 'g');
+    const cssTextMatch = cssTextRegex.exec(updatedSlideCode);
+    
+    if (cssTextMatch) {
+      let cssText = cssTextMatch[2];
+      let cssTextUpdated = false;
+      
+      for (const [styleProp, styleValue] of Object.entries(styleChanges)) {
+        // Look for existing property in cssText
+        const propRegex = new RegExp(`(${styleProp})\\s*:\\s*([^;]*?)(;|$)`, 'g');
+        const propMatch = propRegex.exec(cssText);
+        
+        if (propMatch) {
+          // Replace existing property value
+          cssText = cssText.replace(propMatch[0], `${styleProp}: ${styleValue}${propMatch[3]}`);
+          cssTextUpdated = true;
+        } else {
+          // Add new property to cssText
+          cssText += `${cssText.endsWith(';') ? ' ' : '; '}${styleProp}: ${styleValue};`;
+          cssTextUpdated = true;
+        }
+      }
+      
+      if (cssTextUpdated) {
+        updatedSlideCode = updatedSlideCode.replace(
+          cssTextMatch[0],
+          `${cssTextMatch[1]}${cssText}${cssTextMatch[3]}`
+        );
+        codeWasUpdated = true;
+        console.log(`- Updated cssText with new styles`);
+      }
+    }
+    
+    // Strategy 3: Update innerHTML with style attributes
+    // Only attempt this if the element might be created directly in HTML strings
+    if (textContent && tagName) {
+      const htmlContentRegex = new RegExp(
+        `(innerHTML\\s*=\\s*['"\`][\\s\\S]*?<${tagName}[^>]*?)` +
+        `(style\\s*=\\s*["'])([^"']*?)(['"][^>]*?>[\\s\\S]*?${textContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?)` +
+        `(</${tagName}>)`,
+        'gi'
+      );
+      
+      let htmlMatch;
+      while ((htmlMatch = htmlContentRegex.exec(updatedSlideCode)) !== null) {
+        let styleAttr = htmlMatch[3];
+        let styleUpdated = false;
+        
+        for (const [styleProp, styleValue] of Object.entries(styleChanges)) {
+          // Look for existing property in style attribute
+          const propRegex = new RegExp(`(${styleProp})\\s*:\\s*([^;]*?)(;|$)`, 'g');
+          const propMatch = propRegex.exec(styleAttr);
+          
+          if (propMatch) {
+            // Replace existing property value
+            styleAttr = styleAttr.replace(propMatch[0], `${styleProp}: ${styleValue}${propMatch[3]}`);
+            styleUpdated = true;
+          } else {
+            // Add new property to style attribute
+            styleAttr += `${styleAttr.endsWith(';') ? ' ' : '; '}${styleProp}: ${styleValue};`;
+            styleUpdated = true;
+          }
+        }
+        
+        if (styleUpdated) {
+          // Replace the style attribute with updated one
+          updatedSlideCode = updatedSlideCode.replace(
+            htmlMatch[0],
+            `${htmlMatch[1]}style="${styleAttr}"${htmlMatch[4]}${htmlMatch[5]}`
+          );
+          codeWasUpdated = true;
+          console.log(`- Updated HTML style attribute`);
+        }
+      }
+    }
+    
+    // Apply code updates if we made any changes
+    if (codeWasUpdated) {
+      slides[slideIndex].code = updatedSlideCode;
+      const rebuiltSlides = slides.map(sl => sl.code).join(',\n');
+      originalCode = originalCode.replace(
+        /(const\s+slides\s*=\s*\[)[\s\S]*(\];)/,
+        `$1\n${rebuiltSlides}\n$2`
+      );
+      
+      // Update the editor if we're in the appropriate mode
+      if (showSingleSlide && currentSlideIndex === slideIndex) {
+        editorInstance.setValue(`(${updatedSlideCode})`);
+      } else if (!showSingleSlide) {
+        editorInstance.setValue(originalCode);
+      }
+      
+      console.log('Code updated successfully!');
+    } else {
+      console.warn('Could not locate style patterns to update for', elementVar);
+    }
+  }
 
   // Listen for clicks on 2D elements
   overlay2D.addEventListener('click', (e) => {
     const element = e.target;
     // Example check: only show pane if a text element is clicked
-    if (element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'P') {
+    if (element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'P' || element.tagName === 'LI') {
         e.stopPropagation();
         
         // Check if the clicked element belongs to the current slide
@@ -765,11 +1003,16 @@ playSlides(slides);
             lastClickedElement = element;
             lastClickedElement.classList.add('selected-element');
 
+            // Store element metadata for code updates
+            elementMetadata = getElementPath(element);
+
             // Show existing properties
             fontInput.value = window.getComputedStyle(element).fontFamily.replace(/['"]/g, '');
             fontSizeInput.value = parseInt(window.getComputedStyle(element).fontSize);
             colorInput.value = rgbToHex(window.getComputedStyle(element).color);
-            colorPicker.value = rgbToHex(window.getComputedStyle(element).color);
+            fontWeightInput.value = window.getComputedStyle(element).fontWeight;
+            document.getElementById('colorPicker').value = rgbToHex(window.getComputedStyle(element).color);
+            
             // Open the pane
             bottomPane.classList.add('visible');
         }
@@ -778,10 +1021,11 @@ playSlides(slides);
 
   document.addEventListener('click', (e) => {
     // If the clicked element is not a text element (or within bottomPane), deselect the element.
-    if (!e.target.closest('h1, h2, p') && !e.target.closest('#bottomPane')) {
+    if (!e.target.closest('h1, h2, p, li') && !e.target.closest('#bottomPane')) {
         if (lastClickedElement) {
             lastClickedElement.classList.remove('selected-element');
             lastClickedElement = null;
+            elementMetadata = null;
         }
         bottomPane.classList.remove('visible');
     }
@@ -810,24 +1054,41 @@ function rgbToHex(rgb) {
     const newColor = document.getElementById('colorInput').value;
     const newFontFamily = fontInput.value;
     const newFontSize = fontSizeInput.value + 'px';
-
+    const newFontWeight = fontWeightInput.value;
+    
+    const styleChanges = {};
+    
     // Only update if values are valid
     if (newFontFamily) {
         lastClickedElement.style.fontFamily = newFontFamily;
+        styleChanges['font-family'] = `"${newFontFamily}"`;
     }
     
     if (parseInt(fontSizeInput.value) > 0) {
         lastClickedElement.style.fontSize = newFontSize;
+        styleChanges['font-size'] = newFontSize;
     }
     
     if (/^#[0-9A-F]{6}$/i.test(newColor)) {
         lastClickedElement.style.color = newColor;
+        styleChanges['color'] = newColor;
     }
-}
+    
+    if (newFontWeight !== 'inherit') {
+        lastClickedElement.style.fontWeight = newFontWeight;
+        styleChanges['font-weight'] = newFontWeight;
+    }
+    
+    // Update the code
+    if (Object.keys(styleChanges).length > 0) {
+      updateCodeWithStyleChanges(elementMetadata, styleChanges);
+    }
+  }
 
   fontInput.addEventListener('input', updateElementProperties);
   fontSizeInput.addEventListener('input', updateElementProperties);
   colorInput.addEventListener('input', updateElementProperties);
+  fontWeightInput.addEventListener('change', updateElementProperties);
 
   // Handle color picker input
   document.getElementById('colorPicker').addEventListener('input', (e) => {
