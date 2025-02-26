@@ -71,6 +71,15 @@
       </div>
     </div>
   </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./node_modules/three/build/three.module.js",
+        "node_modules/three/examples/jsm": "./node_modules/three/examples/jsm/"
+      }
+    }
+    </script>
   
   <!-- Load Three.js from a CDN -->
   <script src="https://unpkg.com/three@0.152.0/build/three.min.js"></script>
@@ -78,6 +87,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   <!-- Load Monaco Editor assets -->
   <script src="./vs/loader.js"></script>
-  <script src="renderer.js"></script>
+  <script type="module" src="renderer.js"></script>
 </body>
 </html>
