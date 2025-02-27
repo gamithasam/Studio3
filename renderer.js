@@ -678,13 +678,11 @@ playSlides(slides);
   
   // Optimized animation function that conditionally renders based on focus and presentation state
   function animate() {
-    // Only render if not in presentation mode or if the window is focused
-    if (!isPlaying || document.hasFocus()) {
+    // Pause rendering if slides are playing
+    if (!isPlaying) {
       resizeRenderer();
       renderer.render(scene, camera);
     }
-    
-    // Always request animation frame to keep loop going, but rendering will be conditional
     requestAnimationFrame(animate);
   }
   animate();
@@ -791,10 +789,51 @@ playSlides(slides);
   // Updated play functionality to open a new window instead of toggling fullscreen
   playBtn.addEventListener('click', togglePlay);
 
+  // Add a paused overlay to show when preview is paused
+  function createPausedOverlay() {
+    const pausedOverlay = document.createElement('div');
+    pausedOverlay.id = 'preview-paused-overlay';
+    pausedOverlay.innerHTML = '<div>PREVIEW PAUSED</div><div>Slideshow running in separate window</div>';
+    pausedOverlay.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      font-family: sans-serif;
+      text-align: center;
+    `;
+    pausedOverlay.querySelector('div:first-child').style.cssText = `
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    `;
+    pausedOverlay.querySelector('div:last-child').style.cssText = `
+      font-size: 14px;
+      opacity: 0.8;
+    `;
+    
+    document.getElementById('preview').appendChild(pausedOverlay);
+    return pausedOverlay;
+  }
+
+  const pausedOverlay = createPausedOverlay();
+
+  // Update the togglePlay function to show/hide the paused overlay
   function togglePlay() {
     isPlaying = !isPlaying;
     
     if (isPlaying) {
+      // Show paused overlay when starting presentation
+      pausedOverlay.style.display = 'flex';
+      
       // Reset to first slide if needed
       if (currentSlideIndex !== 0) {
         transitionOutSlide(currentSlideIndex);
@@ -826,6 +865,7 @@ playSlides(slides);
         window.addEventListener('message', function handlePresentationMessage(e) {
           if (e.data.type === 'presentation-closed') {
             isPlaying = false;
+            pausedOverlay.style.display = 'none'; // Hide overlay when presentation is closed
             window.removeEventListener('message', handlePresentationMessage);
           }
         });
@@ -839,8 +879,12 @@ playSlides(slides);
         // If we couldn't open the window (e.g., popup blocked)
         alert('Failed to open presentation. Please allow popups for this site.');
         isPlaying = false;
+        pausedOverlay.style.display = 'none'; // Hide overlay if presentation fails to open
       }
     } else {
+      // Hide paused overlay when stopping presentation
+      pausedOverlay.style.display = 'none';
+      
       // Close the presentation window if it exists
       if (window.presentationWindow && !window.presentationWindow.closed) {
         window.presentationWindow.close();
