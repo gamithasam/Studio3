@@ -669,19 +669,25 @@ playSlides(slides);
   const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 100);
   camera.position.z = 3;
 
-  function animate() {
-    resizeRenderer();
-    requestAnimationFrame(animate);
-    renderer.render(scene, camera);
-  }
-  animate();
-
   // Slide handling variables
   let slidesArray = [];
   let slideData = [];
   let currentSlideIndex = 0;
   let isPlaying = false;
   let playInterval = null;
+  
+  // Optimized animation function that conditionally renders based on focus and presentation state
+  function animate() {
+    // Only render if not in presentation mode or if the window is focused
+    if (!isPlaying || document.hasFocus()) {
+      resizeRenderer();
+      renderer.render(scene, camera);
+    }
+    
+    // Always request animation frame to keep loop going, but rendering will be conditional
+    requestAnimationFrame(animate);
+  }
+  animate();
 
   // UI Elements
   const slidesList = document.getElementById('slidesList');
@@ -782,43 +788,63 @@ playSlides(slides);
     runUserCode(newCode);
   });
 
-  // Updated play functionality to toggle full screen on the preview
+  // Updated play functionality to open a new window instead of toggling fullscreen
   playBtn.addEventListener('click', togglePlay);
 
   function togglePlay() {
     isPlaying = !isPlaying;
     
     if (isPlaying) {
-        // Reset to first slide
-        if (currentSlideIndex !== 0) {
-            transitionOutSlide(currentSlideIndex);
-            currentSlideIndex = 0;
-            transitionInSlide(currentSlideIndex);
-            updateSlidesThumbnails();
-        }
+      // Reset to first slide if needed
+      if (currentSlideIndex !== 0) {
+        transitionOutSlide(currentSlideIndex);
+        currentSlideIndex = 0;
+        transitionInSlide(currentSlideIndex);
+        updateSlidesThumbnails();
+      }
+      
+      // Get the current code to send to the presentation window
+      const userCode = originalCode;
+      
+      // Prepare slide data to send
+      const slideData = {
+        code: userCode
+      };
+      
+      // Encode the data to pass in URL
+      const encodedData = encodeURIComponent(JSON.stringify(slideData));
+      
+      // Open the presentation window
+      const presentationWindow = window.open(
+        `presentation.html?slideData=${encodedData}`, 
+        'presentation',
+        'fullscreen=yes,menubar=no,toolbar=no,location=no'
+      );
+      
+      if (presentationWindow) {
+        // Set up message listener for events from presentation window
+        window.addEventListener('message', function handlePresentationMessage(e) {
+          if (e.data.type === 'presentation-closed') {
+            isPlaying = false;
+            window.removeEventListener('message', handlePresentationMessage);
+          }
+        });
         
-        // Enter fullscreen
-        if (preview.requestFullscreen) {
-            preview.requestFullscreen();
-        } else if (preview.webkitRequestFullscreen) {
-            preview.webkitRequestFullscreen();
-        } else if (preview.msRequestFullscreen) {
-            preview.msRequestFullscreen();
-        }
+        // Keep reference to the window
+        window.presentationWindow = presentationWindow;
         
-        // Start automatic slide progression
-        // playInterval = setInterval(() => {
-        //     transitionOutSlide(currentSlideIndex);
-        //     currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
-        //     transitionInSlide(currentSlideIndex);
-        //     updateSlidesThumbnails();
-        // }, 3000); // Change slide every 3 seconds
+        // Focus on the presentation window
+        presentationWindow.focus();
+      } else {
+        // If we couldn't open the window (e.g., popup blocked)
+        alert('Failed to open presentation. Please allow popups for this site.');
+        isPlaying = false;
+      }
     } else {
-        // Exit fullscreen
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        }
-        clearInterval(playInterval);
+      // Close the presentation window if it exists
+      if (window.presentationWindow && !window.presentationWindow.closed) {
+        window.presentationWindow.close();
+      }
     }
   }
 
@@ -855,7 +881,13 @@ playSlides(slides);
   // Function to run user code from the editor in a sandboxed function
   function runUserCode(code) {
     if (isPlaying) {
-      togglePlay();
+      // Don't toggle play state; instead update the presentation window
+      if (window.presentationWindow && !window.presentationWindow.closed) {
+        window.presentationWindow.postMessage({
+          type: 'slide-update',
+          code: code
+        }, '*');
+      }
     }
 
     // Update the master copy to the current editor code
@@ -1741,7 +1773,7 @@ function rgbToHex(rgb) {
   document.addEventListener('project-loaded', (e) => {
     if (e.detail && e.detail.editorContent) {
       editorInstance.setValue(e.detail.editorContent);
-      originalCode = e.detail.editorContent;
+      originalCode = e.detail.editorContent;  // Add window focus/blur events to optimize performance
       runUserCode(e.detail.editorContent);
     }
   });
@@ -1749,6 +1781,30 @@ function rgbToHex(rgb) {
   // Initialize the media autocomplete provider when editor is ready
   mediaAutocompleteProvider = new MediaAutocompleteProvider(monaco, projectManager);
 });
+
+// Add window focus/blur events to optimize performance
+window.addEventListener('focus', () => {
+  // Resume animation when window is focused
+  if (editorInstance) {
+    editorInstance.layout();
+  }
+});
+
+window.addEventListener('blur', () => {
+  // When window loses focus, make sure we're not doing unnecessary rendering
+  // The animate function will check isPlaying and document.hasFocus()
+});
+
+// Cleanup function for presentation window
+function cleanupPresentationWindow() {
+  if (window.presentationWindow && !window.presentationWindow.closed) {
+    window.presentationWindow.close();
+  }
+  isPlaying = false;
+}
+
+// Add event listener for before unload to clean up presentation window
+window.addEventListener('beforeunload', cleanupPresentationWindow);
 
 document.addEventListener('DOMContentLoaded', () => {
   // This enables the native system title bar to be customized in Electron

@@ -199,6 +199,25 @@ app.on('activate', () => {
   }
 });
 
+// Add handler for window creation
+app.on('web-contents-created', (event, contents) => {
+  contents.on('new-window', (event, url) => {
+    // Allow opening the presentation window
+    if (url.includes('presentation.html')) {
+      // Let it open, but configure the new window
+      event.newGuest = new BrowserWindow({
+        fullscreen: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          enableRemoteModule: false,
+          preload: path.join(__dirname, 'preload.js')
+        }
+      });
+    }
+  });
+});
+
 ipcMain.handle('get-system-fonts', async () => {
   try {
     const fonts = await fontList.getFonts();
