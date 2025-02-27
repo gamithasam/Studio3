@@ -31,23 +31,55 @@
     </div>
 
     <div class="app-content">
-      <!-- Slides panel -->
-      <div class="slides-panel" id="slidesPanel">
-        <div class="slides-content" id="slidesContent">
+      <!-- Left panel container with media and slides -->
+      <div class="left-panel-container" id="leftPanelContainer">
+        <!-- Left panel header with collapse button -->
+        <div class="left-panel-header">
+          <span>Project</span>
+          <button class="collapse-button" id="collapseLeftPanelButton">◀</button>
+        </div>
+        
+        <!-- Media panel -->
+        <div class="media-panel" id="mediaPanel">
+          <div class="media-header">
+            <span>Media</span>
+            <button class="add-button" id="addMediaBtn">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path fill="currentColor" d="M6 1v10M1 6h10"/>
+              </svg>
+              Add Media
+            </button>
+          </div>
+          <div class="media-list" id="mediaList">
+            <!-- Media thumbnails will be added here dynamically -->
+          </div>
+        </div>
+        
+        <!-- Resize handle between Media and Slides panels -->
+        <div class="panel-resize-handle" id="panelResizeHandle"></div>
+        
+        <!-- Slides panel -->
+        <div class="slides-panel" id="slidesPanel">
           <div class="slides-header">
             <span>Slides</span>
-            <button class="collapse-button" id="collapseButton">◀</button>
+            <button class="add-button" id="addSlideBtn">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path fill="currentColor" d="M6 1v10M1 6h10"/>
+              </svg>
+              Add Slide
+            </button>
           </div>
           <div class="slides-list" id="slidesList">
             <!-- Slide thumbnails will be added here dynamically -->
           </div>
         </div>
-        <button class="expand-button hidden" id="expandButton">▶</button>
+        
+        <button class="expand-button hidden" id="expandLeftPanelButton">▶</button>
       </div>
-      
+
       <div class="main-content">
         <div class="toolbar">
-          <button id="addSlideBtn">Add New Slide</button>
+          <button id="toolbarAddSlideBtn">Add New Slide</button>
           <button id="playBtn">▶ Slideshow</button>
         </div>
         

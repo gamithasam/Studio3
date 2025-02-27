@@ -1,8 +1,9 @@
-// This file sets up the Monaco Editor in the left pane and Three.js with GSAP on the right pane.
-// The user code is executed on pressing Enter or clicking Play.
+// Main renderer code for the Animotion application
 
 import { Water } from 'three/addons/objects/Water.js';
 import { Sky } from 'three/addons/objects/Sky.js';
+import ProjectManager from './project-manager.js';
+import MediaAutocompleteProvider from './media-autocomplete.js';
 
 window.Water = Water;
 window.Sky = Sky;
@@ -10,30 +11,45 @@ window.Sky = Sky;
 require.config({ paths: { 'vs': './vs' } });
 
 require(['vs/editor/editor.main'], function(monaco) {
+  // Create project manager instance
+  const projectManager = new ProjectManager();
+  // Expose media loading function to the global scope
+  projectManager.exposeMediaToRenderer();
+  let mediaAutocompleteProvider;
+  
   // Initialize view mode buttons
   const codeOnlyBtn = document.getElementById('codeOnlyBtn');
   const splitBtn = document.getElementById('splitBtn');
   const previewOnlyBtn = document.getElementById('previewOnlyBtn');
+  const addMediaBtn = document.getElementById('addMediaBtn');
 
-  // Initialize resize handle
-  const resizeHandle = document.getElementById('resizeHandle');
+  // Initialize resize handles
+  const horizontalResizeHandle = document.getElementById('resizeHandle');
+  const verticalResizeHandle = document.getElementById('panelResizeHandle');
   const editorSection = document.querySelector('.editor-section');
   const previewSection = document.getElementById('preview');
   const container = document.querySelector('.container');
+  
+  // Panel elements
+  const mediaPanel = document.getElementById('mediaPanel');
+  const slidesPanel = document.getElementById('slidesPanel');
+  const leftPanelContainer = document.getElementById('leftPanelContainer');
+  const collapseLeftPanelButton = document.getElementById('collapseLeftPanelButton');
+  const expandLeftPanelButton = document.getElementById('expandLeftPanelButton');
 
-  // Set up resize functionality
-  let isResizing = false;
+  // Set up horizontal resize functionality
+  let isHorizontalResizing = false;
 
-  resizeHandle.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    resizeHandle.classList.add('active');
-    document.addEventListener('mousemove', handleResize);
-    document.addEventListener('mouseup', stopResize);
+  horizontalResizeHandle.addEventListener('mousedown', (e) => {
+    isHorizontalResizing = true;
+    horizontalResizeHandle.classList.add('active');
+    document.addEventListener('mousemove', handleHorizontalResize);
+    document.addEventListener('mouseup', stopHorizontalResize);
     e.preventDefault();
   });
 
-  function handleResize(e) {
-    if (!isResizing) return;
+  function handleHorizontalResize(e) {
+    if (!isHorizontalResizing) return;
     
     const containerRect = document.querySelector('.editor-preview-container').getBoundingClientRect();
     const containerWidth = containerRect.width;
@@ -56,13 +72,53 @@ require(['vs/editor/editor.main'], function(monaco) {
     }
   }
 
-  function stopResize() {
-    if (!isResizing) return;
+  function stopHorizontalResize() {
+    if (!isHorizontalResizing) return;
     
-    isResizing = false;
-    resizeHandle.classList.remove('active');
-    document.removeEventListener('mousemove', handleResize);
-    document.removeEventListener('mouseup', stopResize);
+    isHorizontalResizing = false;
+    horizontalResizeHandle.classList.remove('active');
+    document.removeEventListener('mousemove', handleHorizontalResize);
+    document.removeEventListener('mouseup', stopHorizontalResize);
+  }
+  
+  // Set up vertical panel resize functionality
+  let isVerticalResizing = false;
+
+  verticalResizeHandle.addEventListener('mousedown', (e) => {
+    isVerticalResizing = true;
+    verticalResizeHandle.classList.add('active');
+    document.addEventListener('mousemove', handleVerticalResize);
+    document.addEventListener('mouseup', stopVerticalResize);
+    e.preventDefault();
+  });
+
+  function handleVerticalResize(e) {
+    if (!isVerticalResizing) return;
+    
+    const leftPanelRect = leftPanelContainer.getBoundingClientRect();
+    const totalHeight = leftPanelRect.height;
+    
+    // Calculate the position relative to the panel's top edge
+    const offsetY = e.clientY - leftPanelRect.top;
+    
+    // Calculate percentage (clamped between 20% and 80%)
+    const percentage = Math.max(20, Math.min(80, (offsetY / totalHeight) * 100));
+    
+    // Set panel heights
+    mediaPanel.style.height = `${percentage}%`;
+    slidesPanel.style.height = `calc(100% - ${percentage}% - 6px)`; // Subtract the resize handle height
+    
+    // Save preference
+    localStorage.setItem('mediaPanelHeightPercentage', percentage);
+  }
+
+  function stopVerticalResize() {
+    if (!isVerticalResizing) return;
+    
+    isVerticalResizing = false;
+    verticalResizeHandle.classList.remove('active');
+    document.removeEventListener('mousemove', handleVerticalResize);
+    document.removeEventListener('mouseup', stopVerticalResize);
   }
 
   // View mode switching
@@ -106,6 +162,14 @@ require(['vs/editor/editor.main'], function(monaco) {
   codeOnlyBtn.addEventListener('click', () => setViewMode('code-only'));
   splitBtn.addEventListener('click', () => setViewMode('split'));
   previewOnlyBtn.addEventListener('click', () => setViewMode('preview-only'));
+  
+  // Add media button click handler
+  addMediaBtn.addEventListener('click', async () => {
+    const result = await window.electronAPI.selectMediaFiles();
+    if (!result.canceled && result.mediaFiles) {
+      projectManager.importMediaFiles(result.mediaFiles);
+    }
+  });
 
   // Handle window resize events
   window.addEventListener('resize', () => {
@@ -129,16 +193,32 @@ require(['vs/editor/editor.main'], function(monaco) {
         editorSection.style.width = '50%';
       }
     }
+    
+    // Set panel heights
+    const savedMediaPanelHeight = localStorage.getItem('mediaPanelHeightPercentage');
+    if (savedMediaPanelHeight) {
+      mediaPanel.style.height = `${savedMediaPanelHeight}%`;
+      slidesPanel.style.height = `calc(100% - ${savedMediaPanelHeight}% - 6px)`;
+    } else {
+      mediaPanel.style.height = '50%';
+      slidesPanel.style.height = 'calc(50% - 6px)';
+    }
+    
+    // Set left panel collapse state
+    const leftPanelCollapsed = localStorage.getItem('leftPanelCollapsed') === 'true';
+    if (leftPanelCollapsed) {
+      leftPanelContainer.classList.add('collapsed');
+      expandLeftPanelButton.classList.remove('hidden');
+    } else {
+      leftPanelContainer.classList.remove('collapsed');
+      expandLeftPanelButton.classList.add('hidden');
+    }
   }
-
 
   // Create the Monaco Editor in the left pane
   const editorContainer = document.getElementById('editor');
   const editorInstance = monaco.editor.create(editorContainer, {
     value: `// Modify the code and press Enter or click Play to run it.
-// This example defines slides that can mix 2D and 3D content freely.
-
-// Modify the code and press Enter or click Play to run it.
 // This example defines slides that can mix 2D and 3D content freely.
 
 const slides = [
@@ -607,26 +687,11 @@ playSlides(slides);
   let playInterval = null;
 
   // UI Elements
-  const slidesPanel = document.getElementById('slidesPanel');
-  const collapseButton = document.getElementById('collapseButton');
   const slidesList = document.getElementById('slidesList');
   const addSlideBtn = document.getElementById('addSlideBtn');
+  const toolbarAddSlideBtn = document.getElementById('toolbarAddSlideBtn');
   const playBtn = document.getElementById('playBtn');
   const slidesContent = document.getElementById('slidesContent');
-  const expandButton = document.getElementById('expandButton');
-
-  // Collapse panel functionality
-  collapseButton.addEventListener('click', () => {
-    slidesPanel.style.width = '40px';
-    slidesContent.style.display = 'none';
-    expandButton.classList.remove('hidden');
-  });
-
-  expandButton.addEventListener('click', () => {
-    slidesPanel.style.width = '200px';
-    slidesContent.style.display = 'flex';
-    expandButton.classList.add('hidden');
-  });
 
   // Update slides thumbnails
   function updateSlidesThumbnails() {
@@ -657,6 +722,39 @@ playSlides(slides);
 
   // Add new slide functionality
   addSlideBtn.addEventListener('click', () => {
+    const currentCode = editorInstance.getValue();
+    const newSlideTemplate = `
+    {
+      init(scene) {
+        // New Slide
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+        return { mesh };
+      },
+      transitionIn({ mesh }) {
+        gsap.fromTo(mesh.scale, { x: 0, y: 0, z: 0 }, { duration: 1, x: 1, y: 1, z: 1 });
+      },
+      transitionOut({ mesh }) {
+        gsap.to(mesh.position, { duration: 1, x: 2 });
+      }
+    }`;
+    
+    // Insert new slide into the code
+    const lastBracketIndex = currentCode.lastIndexOf(']');
+    const newCode = currentCode.slice(0, lastBracketIndex) +
+      (slidesArray.length > 0 ? ',' : '') +
+      newSlideTemplate +
+      currentCode.slice(lastBracketIndex);
+    
+    editorInstance.setValue(newCode);
+    runUserCode(newCode);
+  });
+
+  // Make the toolbar button also add a new slide
+  toolbarAddSlideBtn.addEventListener('click', () => {
+    // Use the same code as for the panel button
     const currentCode = editorInstance.getValue();
     const newSlideTemplate = `
     {
@@ -788,7 +886,7 @@ playSlides(slides);
   function playSlides(slides) {
     slidesArray = slides;
     slideData = slides.map(() => null);
-
+  
     // Initialize each slide with both scene and container access
     slidesArray.forEach((slide, idx) => {
       // Create a container for this slide's 2D content
@@ -803,15 +901,18 @@ playSlides(slides);
         left: 0;
       `;
       overlay2D.appendChild(slideContainer);
-
+  
       // Initialize slide with access to both 3D scene and 2D container
       slideData[idx] = slide.init({
         scene,
         container: slideContainer
       });
       slideData[idx]._container = slideContainer;
+      
+      // Process any media references in the slide container
+      projectManager.processMediaReferences(slideContainer);
     });
-
+  
     updateSlidesThumbnails();
     transitionInSlide(0);
   }
@@ -1626,6 +1727,38 @@ function rgbToHex(rgb) {
   // Run the initial code automatically on load
   initLayout();
   runUserCode(editorInstance.getValue());
+
+  // Add this to expose editor content to window for ProjectManager
+  window.getCurrentEditorContent = function() {
+    return editorInstance ? editorInstance.getValue() : '';
+  };
+
+  // Collapse panel functionality
+  collapseLeftPanelButton.addEventListener('click', () => {
+    leftPanelContainer.classList.add('collapsed');
+    expandLeftPanelButton.classList.remove('hidden');
+    // Save this state
+    localStorage.setItem('leftPanelCollapsed', 'true');
+  });
+
+  expandLeftPanelButton.addEventListener('click', () => {
+    leftPanelContainer.classList.remove('collapsed');
+    expandLeftPanelButton.classList.add('hidden');
+    // Save this state
+    localStorage.setItem('leftPanelCollapsed', 'false');
+  });
+
+  // Add event listener for project loaded event
+  document.addEventListener('project-loaded', (e) => {
+    if (e.detail && e.detail.editorContent) {
+      editorInstance.setValue(e.detail.editorContent);
+      originalCode = e.detail.editorContent;
+      runUserCode(e.detail.editorContent);
+    }
+  });
+
+  // Initialize the media autocomplete provider when editor is ready
+  mediaAutocompleteProvider = new MediaAutocompleteProvider(monaco, projectManager);
 });
 
 document.addEventListener('DOMContentLoaded', () => {
