@@ -4,12 +4,18 @@ const fontList = require('font-list');
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 720,
+    titleBarStyle: 'hidden', // or 'customButtonsOnHover' on macOS
+    titleBarOverlay: {
+      color: '#333333',
+      symbolColor: '#ffffff',
+      height: 40
+    },
     webPreferences: {
-      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      nodeIntegration: false
     }
   });
 
@@ -37,5 +43,12 @@ ipcMain.handle('get-system-fonts', async () => {
   } catch (error) {
     console.error('Error fetching fonts:', error);
     return [];
+  }
+});
+
+ipcMain.handle('set-titlebar-overlay', (event, options) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    win.setTitleBarOverlay(options);
   }
 });

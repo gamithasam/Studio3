@@ -10,6 +10,128 @@ window.Sky = Sky;
 require.config({ paths: { 'vs': './vs' } });
 
 require(['vs/editor/editor.main'], function(monaco) {
+  // Initialize view mode buttons
+  const codeOnlyBtn = document.getElementById('codeOnlyBtn');
+  const splitBtn = document.getElementById('splitBtn');
+  const previewOnlyBtn = document.getElementById('previewOnlyBtn');
+
+  // Initialize resize handle
+  const resizeHandle = document.getElementById('resizeHandle');
+  const editorSection = document.querySelector('.editor-section');
+  const previewSection = document.getElementById('preview');
+  const container = document.querySelector('.container');
+
+  // Set up resize functionality
+  let isResizing = false;
+
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    resizeHandle.classList.add('active');
+    document.addEventListener('mousemove', handleResize);
+    document.addEventListener('mouseup', stopResize);
+    e.preventDefault();
+  });
+
+  function handleResize(e) {
+    if (!isResizing) return;
+    
+    const containerRect = document.querySelector('.editor-preview-container').getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    
+    // Calculate the position relative to the container's left edge
+    const offsetX = e.clientX - containerRect.left;
+    
+    // Calculate percentage (clamped between 20% and 80%)
+    const percentage = Math.max(20, Math.min(80, (offsetX / containerWidth) * 100));
+    
+    // Set editor width as percentage
+    editorSection.style.width = `${percentage}%`;
+    
+    // Save preference
+    localStorage.setItem('editorWidthPercentage', percentage);
+    
+    // Force Monaco editor to update its layout
+    if (editorInstance) {
+      editorInstance.layout();
+    }
+  }
+
+  function stopResize() {
+    if (!isResizing) return;
+    
+    isResizing = false;
+    resizeHandle.classList.remove('active');
+    document.removeEventListener('mousemove', handleResize);
+    document.removeEventListener('mouseup', stopResize);
+  }
+
+  // View mode switching
+  function setViewMode(mode) {
+    // Remove all mode classes first
+    container.classList.remove('code-only', 'split', 'preview-only');
+    
+    // Add the appropriate class
+    container.classList.add(mode);
+    
+    // Update button states
+    codeOnlyBtn.classList.remove('active');
+    splitBtn.classList.remove('active');
+    previewOnlyBtn.classList.remove('active');
+    
+    // Activate the appropriate button
+    switch (mode) {
+      case 'code-only':
+        codeOnlyBtn.classList.add('active');
+        break;
+      case 'preview-only':
+        previewOnlyBtn.classList.add('active');
+        break;
+      default:
+        splitBtn.classList.add('active');
+        break;
+    }
+    
+    // Save preference
+    localStorage.setItem('viewMode', mode);
+    
+    // Force editor layout update after mode change
+    setTimeout(() => {
+      if (editorInstance) {
+        editorInstance.layout();
+      }
+    }, 100);
+  }
+
+  // Attach click handlers to view mode buttons
+  codeOnlyBtn.addEventListener('click', () => setViewMode('code-only'));
+  splitBtn.addEventListener('click', () => setViewMode('split'));
+  previewOnlyBtn.addEventListener('click', () => setViewMode('preview-only'));
+
+  // Handle window resize events
+  window.addEventListener('resize', () => {
+    if (editorInstance) {
+      editorInstance.layout();
+    }
+  });
+
+  // Initialize layout from saved preferences
+  function initLayout() {
+    // Set view mode from saved preference or default to split
+    const savedViewMode = localStorage.getItem('viewMode') || 'split';
+    setViewMode(savedViewMode);
+    
+    // Set editor width if in split mode
+    if (savedViewMode === 'split') {
+      const savedPercentage = localStorage.getItem('editorWidthPercentage');
+      if (savedPercentage) {
+        editorSection.style.width = `${savedPercentage}%`;
+      } else {
+        editorSection.style.width = '50%';
+      }
+    }
+  }
+
+
   // Create the Monaco Editor in the left pane
   const editorContainer = document.getElementById('editor');
   const editorInstance = monaco.editor.create(editorContainer, {
@@ -1502,7 +1624,19 @@ function rgbToHex(rgb) {
   document.head.appendChild(dragStyles);
 
   // Run the initial code automatically on load
+  initLayout();
   runUserCode(editorInstance.getValue());
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  // This enables the native system title bar to be customized in Electron
+  if (window.electronAPI && window.electronAPI.setTitleBarOverlay) {
+    window.electronAPI.setTitleBarOverlay({
+      color: '#333333',
+      symbolColor: '#ffffff',
+      height: 40
+    });
+  }
 });
 
 window.electronAPI.getSystemFonts().then(fonts => {

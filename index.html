@@ -7,65 +7,98 @@
 </head>
 <body>
   <div class="container">
-    <!-- Replace the slides-panel div with this updated structure -->
-    <div class="slides-panel" id="slidesPanel">
-      <div class="slides-content" id="slidesContent">
-        <div class="slides-header">
-          <span>Slides</span>
-          <button class="collapse-button" id="collapseButton">◀</button>
-        </div>
-        <div class="slides-list" id="slidesList">
-          <!-- Slide thumbnails will be added here dynamically -->
-        </div>
+    <!-- Custom title bar -->
+    <div class="title-bar">
+      <div class="title-bar-text">Animotion</div>
+      <div class="view-mode-controls">
+        <button id="codeOnlyBtn" class="view-mode-btn" title="Code Only">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path fill="currentColor" d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/>
+          </svg>
+        </button>
+        <button id="splitBtn" class="view-mode-btn active" title="Split View">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path fill="currentColor" d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm8.5-1v12h5.5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H8.5zm-1 0H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5.5V2z"/>
+          </svg>
+        </button>
+        <button id="previewOnlyBtn" class="view-mode-btn" title="Preview Only">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path fill="currentColor" d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
+            <path fill="currentColor" d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
+          </svg>
+        </button>
       </div>
-      <button class="expand-button hidden" id="expandButton">▶</button>
     </div>
-    
-    <div class="editor-section">
-      <div class="toolbar">
-        <button id="addSlideBtn">Add New Slide</button>
-        <button id="playBtn">▶ Slideshow</button>
-      </div>
-      <!-- Add to editor-section after toolbar -->
-      <div class="editor-tabs">
-        <button id="allSlidesTab" class="editor-tab active">All Slides</button>
-        <button id="oneSlideTab" class="editor-tab">One Slide</button>
-      </div>
-      <div id="editor"></div>
-    </div>
-    
-    <div id="preview">
-      <canvas id="threeCanvas"></canvas>
-      <!-- Add a bottom pane -->
-      <div class="bottom-pane" id="bottomPane">
-        <button id="closeBottomPane">×</button>
-        <div id="propertyControls">
-          <div class="control-group">
-            <label for="fontInput">Font Family</label>
-            <input type="text" id="fontInput" value="Arial" list="fontList" />
-            <datalist id="fontList"></datalist>
+
+    <div class="app-content">
+      <!-- Slides panel -->
+      <div class="slides-panel" id="slidesPanel">
+        <div class="slides-content" id="slidesContent">
+          <div class="slides-header">
+            <span>Slides</span>
+            <button class="collapse-button" id="collapseButton">◀</button>
           </div>
-          
-          <div class="control-group">
-            <label for="fontSizeInput">Font Size (px)</label>
-            <input type="number" id="fontSizeInput" value="16" min="8" max="200" />
+          <div class="slides-list" id="slidesList">
+            <!-- Slide thumbnails will be added here dynamically -->
           </div>
-          
-          <div class="control-group">
-            <label for="colorInput">Text Color</label>
-            <div class="color-with-text">
-              <input type="color" id="colorPicker" value="#ffffff" />
-              <input type="text" id="colorInput" value="#ffffff" />
+        </div>
+        <button class="expand-button hidden" id="expandButton">▶</button>
+      </div>
+      
+      <div class="main-content">
+        <div class="toolbar">
+          <button id="addSlideBtn">Add New Slide</button>
+          <button id="playBtn">▶ Slideshow</button>
+        </div>
+        
+        <div class="editor-preview-container">
+          <div class="editor-section">
+            <!-- Add to editor-section after toolbar -->
+            <div class="editor-tabs">
+              <button id="allSlidesTab" class="editor-tab active">All Slides</button>
+              <button id="oneSlideTab" class="editor-tab">One Slide</button>
             </div>
+            <div id="editor"></div>
           </div>
           
-          <div class="control-group">
-            <label for="fontWeightInput">Font Weight</label>
-            <select id="fontWeightInput" class="select-input">
-              <option value="normal">Normal</option>
-              <option value="bold">Bold</option>
-              <option value="lighter">Light</option>
-            </select>
+          <!-- Add a resize handle -->
+          <div class="resize-handle" id="resizeHandle"></div>
+          
+          <div id="preview">
+            <canvas id="threeCanvas"></canvas>
+            <!-- Add a bottom pane -->
+            <div class="bottom-pane" id="bottomPane">
+              <button id="closeBottomPane">×</button>
+              <div id="propertyControls">
+                <div class="control-group">
+                  <label for="fontInput">Font Family</label>
+                  <input type="text" id="fontInput" value="Arial" list="fontList" />
+                  <datalist id="fontList"></datalist>
+                </div>
+                
+                <div class="control-group">
+                  <label for="fontSizeInput">Font Size (px)</label>
+                  <input type="number" id="fontSizeInput" value="16" min="8" max="200" />
+                </div>
+                
+                <div class="control-group">
+                  <label for="colorInput">Text Color</label>
+                  <div class="color-with-text">
+                    <input type="color" id="colorPicker" value="#ffffff" />
+                    <input type="text" id="colorInput" value="#ffffff" />
+                  </div>
+                </div>
+                
+                <div class="control-group">
+                  <label for="fontWeightInput">Font Weight</label>
+                  <select id="fontWeightInput" class="select-input">
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                    <option value="lighter">Light</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -79,7 +112,7 @@
         "three/addons/": "./node_modules/three/examples/jsm/"
       }
     }
-    </script>
+  </script>
   
   <!-- Load Three.js from a CDN -->
   <script src="https://unpkg.com/three@0.152.0/build/three.min.js"></script>
