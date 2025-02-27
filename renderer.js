@@ -1127,6 +1127,380 @@ function rgbToHex(rgb) {
       }
   });
 
+  // Make elements draggable and update positions in code
+  let isDragging = false;
+  let dragElement = null;
+  let initialX, initialY;
+  let initialElementX, initialElementY;
+  let dragThreshold = 5; // Pixels to move before considered a drag vs a click
+
+  // Handle element drag functionality
+  function initDraggable() {
+    // Add mouse events to the 2D overlay for dragging
+    overlay2D.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', updateDrag);
+    document.addEventListener('mouseup', endDrag);
+    
+    // Double-click should reset position
+    overlay2D.addEventListener('dblclick', resetElementPosition);
+  }
+
+  function startDrag(e) {
+    // Only start dragging on text elements and make sure it's in the current slide
+    const element = e.target;
+    if (!isEditableElement(element)) return;
+    
+    const slideContainer = element.closest('[data-slide-container]');
+    if (!slideContainer || slideContainer !== slideData[currentSlideIndex]._container) return;
+
+    // Mark this element as selected
+    if (lastClickedElement) {
+      lastClickedElement.classList.remove('selected-element');
+    }
+    
+    lastClickedElement = element;
+    element.classList.add('selected-element');
+    elementMetadata = getElementPath(element);
+    showBottomPane(element);
+    
+    // Store initial positions
+    initialX = e.clientX;
+    initialY = e.clientY;
+    
+    // Get current position, whether it's in transform, top/left, or margin
+    const style = window.getComputedStyle(element);
+    initialElementX = parseInt(style.left) || 0;
+    initialElementY = parseInt(style.top) || 0;
+    
+    // Check if element has any position set
+    if (style.position === 'static') {
+      // Make element positioned if it's not already
+      element.style.position = 'relative';
+      initialElementX = 0;
+      initialElementY = 0;
+    }
+    
+    // Set up for drag operation
+    dragElement = element;
+    isDragging = false; // Start with false, will set to true after threshold
+    
+    // Add dragging class for visual feedback
+    element.classList.add('dragging');
+    
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function updateDrag(e) {
+    if (!dragElement) return;
+    
+    // Calculate distance moved
+    const dx = e.clientX - initialX;
+    const dy = e.clientY - initialY;
+    
+    // Only start actual dragging after threshold
+    if (!isDragging && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+      isDragging = true;
+    }
+    
+    if (isDragging) {
+      // Update element position
+      dragElement.style.left = `${initialElementX + dx}px`;
+      dragElement.style.top = `${initialElementY + dy}px`;
+      
+      // Show position feedback
+      showPositionFeedback(dragElement, initialElementX + dx, initialElementY + dy);
+    }
+  }
+
+  function endDrag(e) {
+    if (dragElement) {
+      dragElement.classList.remove('dragging');
+      
+      if (isDragging) {
+        // Calculate final position
+        const dx = e.clientX - initialX;
+        const dy = e.clientY - initialY;
+        const newX = initialElementX + dx;
+        const newY = initialElementY + dy;
+        
+        // Hide position feedback
+        hidePositionFeedback();
+        
+        // Update the code with new position
+        updateElementPositionInCode(dragElement, newX, newY);
+        
+        // Prevent click event from triggering
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
+      dragElement = null;
+      isDragging = false;
+    }
+  }
+
+  // Check if an element is one we want to make draggable
+  function isEditableElement(element) {
+    const editableTags = ['H1', 'H2', 'H3', 'P', 'SPAN', 'DIV', 'LI', 'UL', 'OL'];
+    return editableTags.includes(element.tagName);
+  }
+
+  // Show a position indicator during drag
+  function showPositionFeedback(element, x, y) {
+    let positionDisplay = document.getElementById('position-display');
+    
+    if (!positionDisplay) {
+      positionDisplay = document.createElement('div');
+      positionDisplay.id = 'position-display';
+      positionDisplay.style.cssText = `
+        position: absolute;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        pointer-events: none;
+        z-index: 1000;
+      `;
+      document.body.appendChild(positionDisplay);
+    }
+    
+    // Position the indicator near the element
+    const rect = element.getBoundingClientRect();
+    positionDisplay.style.left = `${rect.right + 10}px`;
+    positionDisplay.style.top = `${rect.top}px`;
+    positionDisplay.textContent = `X: ${Math.round(x)}px, Y: ${Math.round(y)}px`;
+    positionDisplay.style.display = 'block';
+  }
+
+  function hidePositionFeedback() {
+    const positionDisplay = document.getElementById('position-display');
+    if (positionDisplay) {
+      positionDisplay.style.display = 'none';
+    }
+  }
+
+  // Double-click to reset position
+  function resetElementPosition(e) {
+    if (!isEditableElement(e.target)) return;
+    
+    const element = e.target;
+    element.style.left = '';
+    element.style.top = '';
+    
+    // Update the code to remove position
+    updateElementPositionInCode(element, null, null);
+  }
+
+  // Show the bottom pane with the element's current properties
+  function showBottomPane(element) {
+    // Show existing properties
+    fontInput.value = window.getComputedStyle(element).fontFamily.replace(/['"]/g, '');
+    fontSizeInput.value = parseInt(window.getComputedStyle(element).fontSize);
+    colorInput.value = rgbToHex(window.getComputedStyle(element).color);
+    fontWeightInput.value = window.getComputedStyle(element).fontWeight;
+    document.getElementById('colorPicker').value = rgbToHex(window.getComputedStyle(element).color);
+    
+    // Open the pane
+    bottomPane.classList.add('visible');
+  }
+
+  // Update the code with new element position
+  function updateElementPositionInCode(element, x, y) {
+    const elementInfo = getElementPath(element);
+    if (!elementInfo) return;
+    
+    const { slideIndex, tagName, textContent } = elementInfo;
+    const slides = getSlidesArray(originalCode);
+    const slideCode = slides[slideIndex]?.code;
+    
+    if (!slideCode) return;
+    
+    console.log(`Updating position for ${tagName} with content "${textContent}" in slide ${slideIndex+1}`);
+    
+    let updatedSlideCode = slideCode;
+    let codeWasUpdated = false;
+    
+    // Position can be updated in several ways:
+    
+    // 1. For elements in innerHTML, update the style attribute
+    const innerHTMLRegex = /(\w+)\.innerHTML\s*=\s*(`|'|")([\s\S]*?)\2/g;
+    let match;
+    
+    while ((match = innerHTMLRegex.exec(slideCode)) !== null) {
+      const containerVar = match[1];
+      const quoteType = match[2];
+      let htmlContent = match[3];
+      
+      // Look for our element in the HTML content
+      const elementPattern = new RegExp(
+        `(<${tagName}[^>]*?)(style=["']([^"']*)["'])?([^>]*?>)([\\s\\S]*?)</${tagName}>`, 
+        'g'
+      );
+      
+      let elementMatch;
+      let updatedHtmlContent = htmlContent;
+      
+      while ((elementMatch = elementPattern.exec(htmlContent)) !== null) {
+        const elementContent = elementMatch[5].trim();
+        
+        if (!textContent || elementContent.includes(textContent.substring(0, Math.min(10, textContent.length)))) {
+          console.log(`Found matching ${tagName} in innerHTML`);
+          
+          // Extract current style or create new style attribute
+          let styleAttr = elementMatch[3] || '';
+          
+          if (x !== null && y !== null) {
+            // Update position properties
+            styleAttr = updatePositionInStyle(styleAttr, x, y);
+          } else {
+            // Remove position properties
+            styleAttr = removePositionFromStyle(styleAttr);
+          }
+          
+          // Rebuild the element with updated style
+          let updatedElement;
+          if (elementMatch[2]) {
+            // If element already has a style attribute
+            updatedElement = `${elementMatch[1]}style="${styleAttr}"${elementMatch[4]}${elementMatch[5]}</${tagName}>`;
+          } else {
+            // If element doesn't have a style attribute yet
+            updatedElement = `${elementMatch[1]}style="${styleAttr}" ${elementMatch[4]}${elementMatch[5]}</${tagName}>`;
+          }
+          
+          updatedHtmlContent = updatedHtmlContent.replace(elementMatch[0], updatedElement);
+        }
+      }
+      
+      if (updatedHtmlContent !== htmlContent) {
+        // Update the innerHTML in code
+        const fullMatch = `${containerVar}.innerHTML = ${quoteType}${htmlContent}${quoteType}`;
+        const replacement = `${containerVar}.innerHTML = ${quoteType}${updatedHtmlContent}${quoteType}`;
+        
+        updatedSlideCode = updatedSlideCode.replace(fullMatch, replacement);
+        codeWasUpdated = true;
+        console.log(`- Updated position in HTML style attribute`);
+      }
+    }
+    
+    // 2. For direct elements with cssText, update the cssText
+    const cssTextRegex = /(\w+)\.style\.cssText\s*=\s*(['"`])([\s\S]*?)\2/g;
+    
+    while ((match = cssTextRegex.exec(slideCode)) !== null) {
+      const elementVar = match[1];
+      const quoteType = match[2];
+      let cssText = match[3];
+      
+      // Check if this is likely our element by looking for variables related to the element type
+      const tagNameMap = {
+        'h1': ['title', 'heading', 'mainTitle'],
+        'h2': ['subtitle', 'subheading', 'author'],
+        'p': ['description', 'text', 'paragraph'],
+        'li': ['item', 'listItem']
+      };
+      
+      const possibleNames = tagNameMap[tagName] || [];
+      
+      if (possibleNames.includes(elementVar) || 
+          slideCode.includes(`const ${elementVar} = document.createElement('${tagName}')`)) {
+        
+        console.log(`Found matching variable: ${elementVar}`);
+        
+        if (x !== null && y !== null) {
+          // Update position in cssText
+          cssText = updatePositionInStyle(cssText, x, y);
+        } else {
+          // Remove position from cssText
+          cssText = removePositionFromStyle(cssText);
+        }
+        
+        // Update the cssText in code
+        const fullMatch = `${elementVar}.style.cssText = ${quoteType}${match[3]}${quoteType}`;
+        const replacement = `${elementVar}.style.cssText = ${quoteType}${cssText}${quoteType}`;
+        
+        updatedSlideCode = updatedSlideCode.replace(fullMatch, replacement);
+        codeWasUpdated = true;
+        console.log(`- Updated position in cssText`);
+      }
+    }
+    
+    // Apply code updates if we made any changes
+    if (codeWasUpdated) {
+      slides[slideIndex].code = updatedSlideCode;
+      const rebuiltSlides = slides.map(sl => sl.code).join(',\n');
+      originalCode = originalCode.replace(
+        /(const\s+slides\s*=\s*\[)[\s\S]*(\];)/,
+        `$1\n${rebuiltSlides}\n$2`
+      );
+      
+      // Update the editor
+      if (showSingleSlide && currentSlideIndex === slideIndex) {
+        editorInstance.setValue(`(${updatedSlideCode})`);
+      } else if (!showSingleSlide) {
+        editorInstance.setValue(originalCode);
+      }
+      
+      console.log('Position updated in code successfully!');
+    } else {
+      console.warn('Could not update position in code');
+    }
+  }
+
+  // Update position properties in a style string
+  function updatePositionInStyle(styleStr, x, y) {
+    // First make sure the position is explicitly set
+    if (!styleStr.includes('position:')) {
+      styleStr = `position: relative; ${styleStr}`;
+    }
+    
+    // Update or add left property
+    if (styleStr.includes('left:')) {
+      styleStr = styleStr.replace(/left:\s*[^;]*;?/, `left: ${x}px; `);
+    } else {
+      styleStr += `left: ${x}px; `;
+    }
+    
+    // Update or add top property
+    if (styleStr.includes('top:')) {
+      styleStr = styleStr.replace(/top:\s*[^;]*;?/, `top: ${y}px; `);
+    } else {
+      styleStr += `top: ${y}px; `;
+    }
+    
+    return styleStr;
+  }
+
+  // Remove position properties from a style string
+  function removePositionFromStyle(styleStr) {
+    return styleStr
+      .replace(/left:\s*[^;]*;?\s*/g, '')
+      .replace(/top:\s*[^;]*;?\s*/g, '')
+      .replace(/position:\s*[^;]*;?\s*/g, '');
+  }
+
+  // Initialize draggable functionality
+  initDraggable();
+
+  // Add CSS for dragging
+  const dragStyles = document.createElement('style');
+  dragStyles.textContent = `
+    .dragging {
+      cursor: move !important;
+      opacity: 0.8;
+      outline: 2px dashed #007bff;
+    }
+    .selected-element {
+      outline: 2px solid #007bff;
+    }
+    [data-slide-container] h1, [data-slide-container] h2, 
+    [data-slide-container] p, [data-slide-container] li {
+      cursor: pointer;
+      position: relative;
+    }
+  `;
+  document.head.appendChild(dragStyles);
+
   // Run the initial code automatically on load
   runUserCode(editorInstance.getValue());
 });
