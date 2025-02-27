@@ -95,10 +95,66 @@ html, body {
     padding: 10px;
     background: #333333;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     flex-shrink: 0;
     border-bottom: 1px solid #444;
+    height: 20px;
+}
+
+/* Sidebar toggle button */
+.sidebar-toggle {
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    z-index: 10;
+}
+
+.sidebar-toggle:hover {
+    color: #0078d4;
+}
+
+/* Default state - show collapse icon in expanded mode */
+.expand-icon {
+    display: none;
+}
+
+.collapse-icon {
+    display: block;
+}
+
+/* When panel is collapsed, swap the icons */
+.left-panel-container.collapsed .expand-icon {
+    display: block;
+}
+
+.left-panel-container.collapsed .collapse-icon {
+    display: none;
+}
+
+/* Left panel container collapsed state */
+.left-panel-container.collapsed {
+    width: 40px;
+}
+
+.left-panel-container.collapsed .left-panel-header {
+    background: #252526; /* Match the side panel background */
+    justify-content: center; /* Center the icon */
+    border-bottom: none; /* Remove the border for cleaner look */
+}
+
+.left-panel-container.collapsed .media-panel,
+.left-panel-container.collapsed .slides-panel,
+.left-panel-container.collapsed .panel-resize-handle,
+.left-panel-container.collapsed .add-button {
+    display: none;
 }
 
 /* Media panel */
@@ -220,25 +276,6 @@ html, body {
     display: flex;
     flex-direction: column;
     flex: 1;
-}
-
-.collapse-button {
-    background: transparent;
-    border: none;
-    color: #ffffff;
-    cursor: pointer;
-    padding: 4px;
-}
-
-.expand-button {
-    position: absolute;
-    top: 10px;
-    right: 0;
-    background: transparent;
-    border: none;
-    color: #ffffff;
-    cursor: pointer;
-    padding: 4px;
 }
 
 /* Add button styles */
@@ -650,7 +687,6 @@ datalist option:hover {
 .left-panel-container.collapsed .media-panel,
 .left-panel-container.collapsed .slides-panel,
 .left-panel-container.collapsed .panel-resize-handle,
-.left-panel-container.collapsed .left-panel-header span,
 .left-panel-container.collapsed .add-button {
     display: none;
 }

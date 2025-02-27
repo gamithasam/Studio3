@@ -34,8 +34,7 @@ require(['vs/editor/editor.main'], function(monaco) {
   const mediaPanel = document.getElementById('mediaPanel');
   const slidesPanel = document.getElementById('slidesPanel');
   const leftPanelContainer = document.getElementById('leftPanelContainer');
-  const collapseLeftPanelButton = document.getElementById('collapseLeftPanelButton');
-  const expandLeftPanelButton = document.getElementById('expandLeftPanelButton');
+  const sidebarToggle = document.getElementById('sidebarToggle');
 
   // Set up horizontal resize functionality
   let isHorizontalResizing = false;
@@ -208,10 +207,8 @@ require(['vs/editor/editor.main'], function(monaco) {
     const leftPanelCollapsed = localStorage.getItem('leftPanelCollapsed') === 'true';
     if (leftPanelCollapsed) {
       leftPanelContainer.classList.add('collapsed');
-      expandLeftPanelButton.classList.remove('hidden');
     } else {
       leftPanelContainer.classList.remove('collapsed');
-      expandLeftPanelButton.classList.add('hidden');
     }
   }
 
@@ -1733,19 +1730,11 @@ function rgbToHex(rgb) {
     return editorInstance ? editorInstance.getValue() : '';
   };
 
-  // Collapse panel functionality
-  collapseLeftPanelButton.addEventListener('click', () => {
-    leftPanelContainer.classList.add('collapsed');
-    expandLeftPanelButton.classList.remove('hidden');
-    // Save this state
-    localStorage.setItem('leftPanelCollapsed', 'true');
-  });
-
-  expandLeftPanelButton.addEventListener('click', () => {
-    leftPanelContainer.classList.remove('collapsed');
-    expandLeftPanelButton.classList.add('hidden');
-    // Save this state
-    localStorage.setItem('leftPanelCollapsed', 'false');
+  // Replace the separate collapse/expand functions with a single toggle
+  sidebarToggle.addEventListener('click', () => {
+    const isCollapsed = leftPanelContainer.classList.toggle('collapsed');
+    // Save state
+    localStorage.setItem('leftPanelCollapsed', isCollapsed);
   });
 
   // Add event listener for project loaded event
