@@ -26,6 +26,9 @@ window.Sky = Sky;
   let slideData = [];
   let currentSlideIndex = 0;
   let isTransitioning = false;
+  
+  // Media storage
+  const mediaStore = {};
 
   // Show loading message
   overlay2D.innerHTML = '<h1 style="color:white">Loading presentation...</h1>';
@@ -49,6 +52,120 @@ window.Sky = Sky;
     renderer.render(scene, camera);
   }
   animate();
+
+  // Process received media data
+  function processMediaData(media) {
+    if (!media || !Array.isArray(media) || media.length === 0) return;
+    
+    media.forEach(item => {
+      mediaStore[item.id] = item;
+      // Create an element in the document head for loading media
+      const mediaElement = document.createElement(
+        item.type === 'mp4' || item.type === 'mov' ? 'video' : 
+        item.type === 'mp3' || item.type === 'wav' ? 'audio' : 
+        'img'
+      );
+      
+      mediaElement.id = `media-${item.id}`;
+      mediaElement.style.display = 'none';
+      mediaElement.src = `data:${getMimeType(item.type)};base64,${item.data}`;
+      document.head.appendChild(mediaElement);
+    });
+    
+    // Expose a global helper function to get media elements
+    window.getMediaElement = function(id) {
+      return document.getElementById(`media-${id}`);
+    };
+    
+    // Set up THREE.js texture interceptor for media paths
+    setupTextureInterceptor();
+  }
+
+  // Setup THREE.js texture loader interceptor
+  function setupTextureInterceptor() {
+    // Save the original TextureLoader.load method
+    const originalTextureLoader = THREE.TextureLoader.prototype.load;
+    
+    // Override the TextureLoader.load method to intercept media paths
+    THREE.TextureLoader.prototype.load = function(url, onLoad, onProgress, onError) {
+      // Check if this is a media reference
+      if (typeof url === 'string' && url.startsWith('media/')) {
+        const mediaId = url.replace('media/', '');
+        const mediaItem = mediaStore[mediaId];
+        
+        if (mediaItem) {
+          // Replace with data URL
+          url = `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
+          // FIX: Correct the syntax error in the log message
+          console.log(`Intercepted media path ${mediaId}, using data URL instead`);
+        } else {
+          console.warn(`Media item not found: ${mediaId}`);
+        }
+      }
+      
+      // Call the original method with potentially modified URL
+      return originalTextureLoader.call(this, url, onLoad, onProgress, onError);
+    };
+  }
+
+  // Helper function to get MIME type
+  function getMimeType(extension) {
+    const mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'mp4': 'video/mp4',
+      'mov': 'video/quicktime',
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav'
+    };
+    return mimeTypes[extension] || 'application/octet-stream';
+  }
+  
+  // Add global media loading function for direct access from slide code
+  window.loadMediaFromProject = function(mediaPath) {
+    if (!mediaPath || !mediaPath.startsWith('media/')) {
+      return null;
+    }
+    
+    const mediaId = mediaPath.replace('media/', '');
+    const mediaItem = mediaStore[mediaId];
+    
+    if (!mediaItem) {
+      console.warn(`Media item not found: ${mediaId}`);
+      return null;
+    }
+    
+    return `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
+  };
+
+  // Process media references in HTML
+  function processMediaReferences(container) {
+    if (!container) return;
+    
+    // Find all elements with data-media-id attribute
+    const mediaElements = container.querySelectorAll('[data-media-id]');
+    
+    mediaElements.forEach(element => {
+      const mediaId = element.getAttribute('data-media-id');
+      if (mediaStore[mediaId]) {
+        const item = mediaStore[mediaId];
+        
+        if (element.tagName === 'IMG') {
+          element.src = `data:${getMimeType(item.type)};base64,${item.data}`;
+        } else if (element.tagName === 'VIDEO') {
+          element.src = `data:${getMimeType(item.type)};base64,${item.data}`;
+          element.controls = true;
+        } else if (element.tagName === 'AUDIO') {
+          element.src = `data:${getMimeType(item.type)};base64,${item.data}`;
+          element.controls = true;
+        } else if (element.style.backgroundImage) {
+          element.style.backgroundImage = `url(data:${getMimeType(item.type)};base64,${item.data})`;
+        }
+      }
+    });
+  }
 
   // Window resize handler
   window.addEventListener('resize', () => {
@@ -169,6 +286,9 @@ window.Sky = Sky;
           container: slideContainer
         });
         slideData[idx]._container = slideContainer;
+        
+        // Process any media references in the slide container
+        processMediaReferences(slideContainer);
       } catch (error) {
         console.error(`Error initializing slide ${idx}:`, error);
       }
@@ -238,6 +358,11 @@ window.Sky = Sky;
     if (event.data.type === 'slide-update') {
       evaluateUserCode(event.data.code);
     } else if (event.data.type === 'slide-data') {
+      // Process media data if available
+      if (event.data.media) {
+        processMediaData(event.data.media);
+      }
+      
       // Initial slide data received
       overlay2D.innerHTML = ''; // Clear loading message
       evaluateUserCode(event.data.code);

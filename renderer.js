@@ -66,8 +66,8 @@ require(['vs/editor/editor.main'], function(monaco) {
     localStorage.setItem('editorWidthPercentage', percentage);
     
     // Force Monaco editor to update its layout
-    if (editorInstance) {
-      editorInstance.layout();
+    if (window.editorInstance) {
+      window.editorInstance.layout();
     }
   }
 
@@ -151,8 +151,8 @@ require(['vs/editor/editor.main'], function(monaco) {
     
     // Force editor layout update after mode change
     setTimeout(() => {
-      if (editorInstance) {
-        editorInstance.layout();
+      if (window.editorInstance) {
+        window.editorInstance.layout();
       }
     }, 100);
   }
@@ -172,8 +172,8 @@ require(['vs/editor/editor.main'], function(monaco) {
 
   // Handle window resize events
   window.addEventListener('resize', () => {
-    if (editorInstance) {
-      editorInstance.layout();
+    if (window.editorInstance) {
+      window.editorInstance.layout();
     }
   });
 
@@ -512,6 +512,9 @@ playSlides(slides);
     automaticLayout: true,
     theme: 'vs-dark'
   });
+
+  // Make editorInstance available globally
+  window.editorInstance = editorInstance;
 
   // Create a container for 2D content
   const overlay2D = document.createElement('div');
@@ -860,10 +863,12 @@ playSlides(slides);
             pausedOverlay.style.display = 'none'; // Hide overlay when presentation is closed
             window.removeEventListener('message', handlePresentationMessage);
           } else if (e.data.type === 'presentation-ready') {
-            // When the presentation window signals it's ready, send the slide data
+            // When the presentation window signals it's ready, send the slide data and media data
+            const mediaData = projectManager.getAllMediaData(); // Get all media data
             presentationWindow.postMessage({
               type: 'slide-data',
-              code: userCode
+              code: userCode,
+              media: mediaData
             }, '*');
           }
         });
@@ -1827,8 +1832,8 @@ function rgbToHex(rgb) {
 // Add window focus/blur events to optimize performance
 window.addEventListener('focus', () => {
   // Resume animation when window is focused
-  if (editorInstance) {
-    editorInstance.layout();
+  if (window.editorInstance) {
+    window.editorInstance.layout();
   }
 });
 

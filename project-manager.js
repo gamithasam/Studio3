@@ -509,6 +509,16 @@ playSlides(slides);`;
       console.error('Error setting up media interceptors:', err);
     }
   }
+
+  // Add a method to get all media data for the presentation
+  getAllMediaData() {
+    return this.mediaAssets.map(item => ({
+      id: item.id || item.name, // Use name as fallback ID if no ID is present
+      name: item.name,
+      type: item.type,
+      data: item.data
+    }));
+  }
 }
 
 // Export the class
