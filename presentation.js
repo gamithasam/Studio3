@@ -48,7 +48,13 @@ window.Sky = Sky;
 
   // Animation loop
   function animate() {
-    requestAnimationFrame(animate);
+    // Use high-resolution timestamps to calculate smoother animation deltas if needed
+    const now = performance.now();
+    
+    // Schedule the next frame immediately for smoother animations
+    const animationId = requestAnimationFrame(animate);
+    
+    // Render the scene
     renderer.render(scene, camera);
   }
   animate();
@@ -201,34 +207,42 @@ window.Sky = Sky;
     isTransitioning = true;
     const nextIndex = (currentSlideIndex + 1) % slidesArray.length;
     
-    // Make sure the next slide is ready but not visible
-    prepareSlide(nextIndex);
-    
-    // Start transitioning out the current slide
-    transitionOutSlide(currentSlideIndex, () => {
-      // Start transition in of next slide immediately, with overlap
-      transitionInSlide(nextIndex);
-      currentSlideIndex = nextIndex;
-      isTransitioning = false;
+    // Better preparation sequence for next slide
+    requestHighQualityFrame(() => {
+      prepareSlide(nextIndex);
+      
+      // First start exiting the current slide
+      transitionOutSlide(currentSlideIndex, () => {
+        // Then transition in the next slide after the outgoing transition has started
+        requestHighQualityFrame(() => {
+          transitionInSlide(nextIndex);
+          currentSlideIndex = nextIndex;
+          isTransitioning = false;
+          
+          // Preload the next slide in the sequence for even smoother transitions
+          preloadNextSlide();
+        });
+      });
     });
   }
 
-  // Navigate to previous slide with same overlapping pattern
+  // Similarly update the prevSlide function
   function prevSlide() {
     if (!slidesArray.length || isTransitioning) return;
     
     isTransitioning = true;
     const prevIndex = (currentSlideIndex - 1 + slidesArray.length) % slidesArray.length;
     
-    // Make sure the previous slide is ready but not visible
-    prepareSlide(prevIndex);
-    
-    // Start transitioning out the current slide
-    transitionOutSlide(currentSlideIndex, () => {
-      // Start transition in of previous slide immediately
-      transitionInSlide(prevIndex);
-      currentSlideIndex = prevIndex;
-      isTransitioning = false;
+    requestHighQualityFrame(() => {
+      prepareSlide(prevIndex);
+      
+      transitionOutSlide(currentSlideIndex, () => {
+        requestHighQualityFrame(() => {
+          transitionInSlide(prevIndex);
+          currentSlideIndex = prevIndex;
+          isTransitioning = false;
+        });
+      });
     });
   }
 
@@ -240,6 +254,9 @@ window.Sky = Sky;
     // Make visible but fully transparent
     data._container.style.display = 'flex';
     data._container.style.opacity = '0';
+    
+    // Force layout calculation to ensure the browser processes the new elements
+    data._container.offsetHeight; // This triggers a reflow
   }
 
   // Evaluate user code
@@ -298,6 +315,7 @@ window.Sky = Sky;
     transitionInSlide(0);
   }
 
+  // Improved transition handling
   function transitionInSlide(index) {
     const slide = slidesArray[index];
     const data = slideData[index];
@@ -307,16 +325,19 @@ window.Sky = Sky;
     // Remove any temporary opacity setting
     data._container.style.removeProperty('opacity');
 
-    // Show current slide's 2D container
+    // Make sure container is shown before transition
     data._container.style.display = 'flex';
 
-    try {
-      if (slide.transitionIn) {
-        slide.transitionIn(data);
+    // Request animation frame to ensure the DOM has been updated before animating
+    requestAnimationFrame(() => {
+      try {
+        if (slide.transitionIn) {
+          slide.transitionIn(data);
+        }
+      } catch (error) {
+        console.error(`Error in transitionIn for slide ${index}:`, error);
       }
-    } catch (error) {
-      console.error(`Error in transitionIn for slide ${index}:`, error);
-    }
+    });
   }
 
   function transitionOutSlide(index, callback) {
@@ -333,10 +354,11 @@ window.Sky = Sky;
         // Start transition out and call the callback after a short delay
         slide.transitionOut(data);
         
-        // We use a shorter timeout to create some overlap between transitions
+        // Use a shorter timeout to create some overlap between transitions
+        // This creates a smoother experience between slides
         setTimeout(() => {
           if (callback) callback();
-        }, 500); // Half a second overlap
+        }, 300); // Shorter overlap for faster transitions
       } else {
         // If there's no transition, call the callback immediately
         if (callback) callback();
@@ -348,9 +370,29 @@ window.Sky = Sky;
     }
 
     // Clean up the slide after transition completes
+    // Use a slightly longer delay to ensure transitions have fully completed
     setTimeout(() => {
       data._container.style.display = 'none';
-    }, 1000); // Full cleanup delay
+    }, 1200); // Give more time for transitions to complete
+  }
+
+  // Add an additional function for preloading next slide resources
+  function preloadNextSlide() {
+    if (!slidesArray.length) return;
+    
+    const nextIndex = (currentSlideIndex + 1) % slidesArray.length;
+    prepareSlide(nextIndex);
+  }
+
+  // Request a high-quality animation frame
+  function requestHighQualityFrame(callback) {
+    // Use setTimeout with 0 delay to break out of the current task
+    setTimeout(() => {
+      // Then use requestAnimationFrame for the next visual update
+      requestAnimationFrame(() => {
+        callback();
+      });
+    }, 0);
   }
 
   // Handle window events
