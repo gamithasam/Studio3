@@ -1,4 +1,10 @@
 // Presentation View Script
+import { Water } from 'three/addons/objects/Water.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+
+// Make Water and Sky available globally
+window.Water = Water;
+window.Sky = Sky;
 
 (async function() {
   // Elements
@@ -21,21 +27,19 @@
   let currentSlideIndex = 0;
   let isTransitioning = false;
 
-  // Get slide data from main window
+  // Show loading message
+  overlay2D.innerHTML = '<h1 style="color:white">Loading presentation...</h1>';
+
+  // Request slide data from parent window
   try {
-    // Request slide code from parent window
-    const params = new URLSearchParams(window.location.search);
-    const slideDataJson = params.get('slideData');
-    
-    if (slideDataJson) {
-      const slideInfo = JSON.parse(decodeURIComponent(slideDataJson));
-      evaluateUserCode(slideInfo.code);
+    // Signal to parent window that we're ready to receive data
+    if (window.opener) {
+      window.opener.postMessage({ type: 'presentation-ready' }, '*');
     } else {
-      console.error("No slide data provided");
-      overlay2D.innerHTML = '<h1 style="color:white">No slide data available</h1>';
+      overlay2D.innerHTML = '<h1 style="color:white">Error: No parent window found</h1>';
     }
   } catch (error) {
-    console.error("Error initializing presentation:", error);
+    console.error("Error requesting slide data:", error);
     overlay2D.innerHTML = '<h1 style="color:white">Error loading slides</h1>';
   }
 
@@ -57,7 +61,7 @@
   window.addEventListener('keydown', (e) => {
     if (isTransitioning) return;
     
-    if (e.key === 'ArrowRight' || e.key === 'Space') {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Space') {
       nextSlide();
     } else if (e.key === 'ArrowLeft') {
       prevSlide();
@@ -73,28 +77,52 @@
     window.close();
   }
 
-  // Navigate to next slide
+  // Improved slide navigation with overlapping transitions
   function nextSlide() {
     if (!slidesArray.length || isTransitioning) return;
     
     isTransitioning = true;
+    const nextIndex = (currentSlideIndex + 1) % slidesArray.length;
+    
+    // Make sure the next slide is ready but not visible
+    prepareSlide(nextIndex);
+    
+    // Start transitioning out the current slide
     transitionOutSlide(currentSlideIndex, () => {
-      currentSlideIndex = (currentSlideIndex + 1) % slidesArray.length;
-      transitionInSlide(currentSlideIndex);
+      // Start transition in of next slide immediately, with overlap
+      transitionInSlide(nextIndex);
+      currentSlideIndex = nextIndex;
       isTransitioning = false;
     });
   }
 
-  // Navigate to previous slide
+  // Navigate to previous slide with same overlapping pattern
   function prevSlide() {
     if (!slidesArray.length || isTransitioning) return;
     
     isTransitioning = true;
+    const prevIndex = (currentSlideIndex - 1 + slidesArray.length) % slidesArray.length;
+    
+    // Make sure the previous slide is ready but not visible
+    prepareSlide(prevIndex);
+    
+    // Start transitioning out the current slide
     transitionOutSlide(currentSlideIndex, () => {
-      currentSlideIndex = (currentSlideIndex - 1 + slidesArray.length) % slidesArray.length;
-      transitionInSlide(currentSlideIndex);
+      // Start transition in of previous slide immediately
+      transitionInSlide(prevIndex);
+      currentSlideIndex = prevIndex;
       isTransitioning = false;
     });
+  }
+
+  // Prepare a slide container for display without animation
+  function prepareSlide(index) {
+    const data = slideData[index];
+    if (!data) return;
+    
+    // Make visible but fully transparent
+    data._container.style.display = 'flex';
+    data._container.style.opacity = '0';
   }
 
   // Evaluate user code
@@ -156,6 +184,9 @@
     
     if (!slide || !data) return;
 
+    // Remove any temporary opacity setting
+    data._container.style.removeProperty('opacity');
+
     // Show current slide's 2D container
     data._container.style.display = 'flex';
 
@@ -179,22 +210,36 @@
 
     try {
       if (slide.transitionOut) {
+        // Start transition out and call the callback after a short delay
         slide.transitionOut(data);
+        
+        // We use a shorter timeout to create some overlap between transitions
+        setTimeout(() => {
+          if (callback) callback();
+        }, 500); // Half a second overlap
+      } else {
+        // If there's no transition, call the callback immediately
+        if (callback) callback();
       }
     } catch (error) {
       console.error(`Error in transitionOut for slide ${index}:`, error);
+      // Still call the callback to prevent getting stuck
+      if (callback) callback();
     }
 
-    // Hide 2D container after transition with timeout
+    // Clean up the slide after transition completes
     setTimeout(() => {
       data._container.style.display = 'none';
-      if (callback) callback();
-    }, 1000);
+    }, 1000); // Full cleanup delay
   }
 
   // Handle window events
   window.addEventListener('message', (event) => {
     if (event.data.type === 'slide-update') {
+      evaluateUserCode(event.data.code);
+    } else if (event.data.type === 'slide-data') {
+      // Initial slide data received
+      overlay2D.innerHTML = ''; // Clear loading message
       evaluateUserCode(event.data.code);
     }
   });

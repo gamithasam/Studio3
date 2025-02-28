@@ -845,17 +845,9 @@ playSlides(slides);
       // Get the current code to send to the presentation window
       const userCode = originalCode;
       
-      // Prepare slide data to send
-      const slideData = {
-        code: userCode
-      };
-      
-      // Encode the data to pass in URL
-      const encodedData = encodeURIComponent(JSON.stringify(slideData));
-      
-      // Open the presentation window
+      // Open the presentation window without data in URL
       const presentationWindow = window.open(
-        `presentation.html?slideData=${encodedData}`, 
+        `presentation.html`, 
         'presentation',
         'fullscreen=yes,menubar=no,toolbar=no,location=no'
       );
@@ -867,6 +859,12 @@ playSlides(slides);
             isPlaying = false;
             pausedOverlay.style.display = 'none'; // Hide overlay when presentation is closed
             window.removeEventListener('message', handlePresentationMessage);
+          } else if (e.data.type === 'presentation-ready') {
+            // When the presentation window signals it's ready, send the slide data
+            presentationWindow.postMessage({
+              type: 'slide-data',
+              code: userCode
+            }, '*');
           }
         });
         
