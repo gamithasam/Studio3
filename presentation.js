@@ -64,7 +64,12 @@ window.Sky = Sky;
     if (!media || !Array.isArray(media) || media.length === 0) return;
     
     media.forEach(item => {
+      // Use item.id as the key directly AND store with media/ prefix for easier lookup
       mediaStore[item.id] = item;
+      mediaStore[`media/${item.id}`] = item; // Add with media/ prefix for direct matching
+      
+      console.log(`Loaded media: ${item.id} (${item.type})`);
+      
       // Create an element in the document head for loading media
       const mediaElement = document.createElement(
         item.type === 'mp4' || item.type === 'mov' ? 'video' : 
@@ -80,11 +85,27 @@ window.Sky = Sky;
     
     // Expose a global helper function to get media elements
     window.getMediaElement = function(id) {
-      return document.getElementById(`media-${id}`);
+      // Handle both 'id' and 'media/id' formats
+      const cleanId = id.startsWith('media/') ? id.substring(6) : id;
+      return document.getElementById(`media-${cleanId}`);
     };
     
-    // Set up THREE.js texture interceptor for media paths
+    // Set up interceptors for all media references
+    setupMediaInterceptors();
+  }
+
+  // Setup comprehensive media interceptors
+  function setupMediaInterceptors() {
+    // 1. Override THREE.TextureLoader for 3D textures
     setupTextureInterceptor();
+    
+    // 2. Override Image constructor for any dynamically created images
+    setupImageInterceptor();
+    
+    // 3. Override fetch and XMLHttpRequest for any other media loading methods
+    setupFetchInterceptor();
+    
+    console.log("All media interceptors have been set up");
   }
 
   // Setup THREE.js texture loader interceptor
@@ -95,23 +116,108 @@ window.Sky = Sky;
     // Override the TextureLoader.load method to intercept media paths
     THREE.TextureLoader.prototype.load = function(url, onLoad, onProgress, onError) {
       // Check if this is a media reference
-      if (typeof url === 'string' && url.startsWith('media/')) {
-        const mediaId = url.replace('media/', '');
-        const mediaItem = mediaStore[mediaId];
-        
-        if (mediaItem) {
-          // Replace with data URL
-          url = `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
-          // FIX: Correct the syntax error in the log message
-          console.log(`Intercepted media path ${mediaId}, using data URL instead`);
-        } else {
-          console.warn(`Media item not found: ${mediaId}`);
-        }
+      const interceptedUrl = interceptMediaPath(url);
+      
+      if (interceptedUrl !== url) {
+        console.log(`TextureLoader: Intercepted ${url} → ${interceptedUrl.substring(0, 50)}...`);
+        url = interceptedUrl;
       }
       
       // Call the original method with potentially modified URL
       return originalTextureLoader.call(this, url, onLoad, onProgress, onError);
     };
+  }
+  
+  // Setup Image constructor interceptor
+  function setupImageInterceptor() {
+    // Save references to original methods
+    const originalImageSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    
+    // Override the src setter for Image objects
+    Object.defineProperty(HTMLImageElement.prototype, 'src', {
+      set: function(url) {
+        const interceptedUrl = interceptMediaPath(url);
+        
+        if (interceptedUrl !== url) {
+          console.log(`Image.src: Intercepted ${url} → ${interceptedUrl.substring(0, 50)}...`);
+          originalImageSrc.set.call(this, interceptedUrl);
+        } else {
+          originalImageSrc.set.call(this, url);
+        }
+      },
+      get: originalImageSrc.get
+    });
+  }
+  
+  // Setup fetch and XMLHttpRequest interceptors
+  function setupFetchInterceptor() {
+    // Save original fetch
+    const originalFetch = window.fetch;
+    
+    // Override fetch
+    window.fetch = function(url, options) {
+      if (typeof url === 'string') {
+        const interceptedUrl = interceptMediaPath(url);
+        
+        if (interceptedUrl !== url) {
+          console.log(`fetch: Intercepted ${url} → ${interceptedUrl.substring(0, 50)}...`);
+          return originalFetch.call(this, interceptedUrl, options);
+        }
+      }
+      
+      return originalFetch.call(this, url, options);
+    };
+    
+    // Save original XMLHttpRequest open
+    const originalOpen = XMLHttpRequest.prototype.open;
+    
+    // Override XMLHttpRequest.open
+    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+      if (typeof url === 'string') {
+        const interceptedUrl = interceptMediaPath(url);
+        
+        if (interceptedUrl !== url) {
+          console.log(`XMLHttpRequest: Intercepted ${url} → ${interceptedUrl.substring(0, 50)}...`);
+          return originalOpen.call(this, method, interceptedUrl, async, user, password);
+        }
+      }
+      
+      return originalOpen.call(this, method, url, async, user, password);
+    };
+  }
+  
+  // Core function to intercept and process media paths
+  function interceptMediaPath(url) {
+    if (!url || typeof url !== 'string') return url;
+    
+    // Check if url starts with media/ or contains /media/
+    const isMediaPath = url.startsWith('media/') || url.includes('/media/');
+    if (!isMediaPath) return url;
+    
+    let mediaId;
+    if (url.startsWith('media/')) {
+      mediaId = url;
+    } else {
+      const parts = url.split('/media/');
+      mediaId = 'media/' + parts[parts.length - 1];
+    }
+    
+    // First try with the exact path
+    let mediaItem = mediaStore[mediaId];
+    
+    // If not found, try extracting just the filename
+    if (!mediaItem) {
+      const fileName = mediaId.split('/').pop();
+      mediaItem = mediaStore[fileName] || mediaStore[`media/${fileName}`];
+    }
+    
+    if (mediaItem) {
+      // Return data URL
+      return `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
+    }
+    
+    console.warn(`Media not found: ${mediaId}`);
+    return url;
   }
 
   // Helper function to get MIME type
@@ -131,43 +237,64 @@ window.Sky = Sky;
   
   // Add global media loading function for direct access from slide code
   window.loadMediaFromProject = function(mediaPath) {
-    if (!mediaPath || !mediaPath.startsWith('media/')) {
-      return null;
-    }
-    
-    const mediaId = mediaPath.replace('media/', '');
-    const mediaItem = mediaStore[mediaId];
-    
-    if (!mediaItem) {
-      console.warn(`Media item not found: ${mediaId}`);
-      return null;
-    }
-    
-    return `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
+    return interceptMediaPath(mediaPath);
   };
 
   // Process media references in HTML
   function processMediaReferences(container) {
     if (!container) return;
     
-    // Find all elements with data-media-id attribute
-    const mediaElements = container.querySelectorAll('[data-media-id]');
+    // Process all image, video, and audio elements
+    const mediaElementSelectors = 'img[src], video[src], audio[src], [style*="background-image"]';
+    const mediaElements = container.querySelectorAll(mediaElementSelectors);
     
     mediaElements.forEach(element => {
-      const mediaId = element.getAttribute('data-media-id');
-      if (mediaStore[mediaId]) {
-        const item = mediaStore[mediaId];
+      // Process elements with explicit media path in src
+      if (element.hasAttribute('src')) {
+        const src = element.getAttribute('src');
+        if (src && (src.startsWith('media/') || src.includes('/media/'))) {
+          const interceptedUrl = interceptMediaPath(src);
+          if (interceptedUrl !== src) {
+            console.log(`processMediaReferences: Updating ${element.tagName} src from ${src} to data URL`);
+            element.setAttribute('src', interceptedUrl);
+          }
+        }
+      }
+      
+      // Process elements with background-image in style
+      if (element.style && element.style.backgroundImage) {
+        const bgImage = element.style.backgroundImage;
+        if (bgImage.includes('media/') || bgImage.includes('/media/')) {
+          const urlMatch = bgImage.match(/url\(['"]?(.*?)['"]?\)/);
+          if (urlMatch && urlMatch[1]) {
+            const originalUrl = urlMatch[1];
+            const interceptedUrl = interceptMediaPath(originalUrl);
+            if (interceptedUrl !== originalUrl) {
+              console.log(`processMediaReferences: Updating backgroundImage from ${originalUrl} to data URL`);
+              element.style.backgroundImage = `url(${interceptedUrl})`;
+            }
+          }
+        }
+      }
+      
+      // Also check data-media-id attribute for backward compatibility
+      if (element.hasAttribute('data-media-id')) {
+        const mediaId = element.getAttribute('data-media-id');
+        const mediaItem = mediaStore[mediaId] || mediaStore[`media/${mediaId}`];
         
-        if (element.tagName === 'IMG') {
-          element.src = `data:${getMimeType(item.type)};base64,${item.data}`;
-        } else if (element.tagName === 'VIDEO') {
-          element.src = `data:${getMimeType(item.type)};base64,${item.data}`;
-          element.controls = true;
-        } else if (element.tagName === 'AUDIO') {
-          element.src = `data:${getMimeType(item.type)};base64,${item.data}`;
-          element.controls = true;
-        } else if (element.style.backgroundImage) {
-          element.style.backgroundImage = `url(data:${getMimeType(item.type)};base64,${item.data})`;
+        if (mediaItem) {
+          console.log(`Processing element with data-media-id: ${mediaId}`);
+          if (element.tagName === 'IMG') {
+            element.src = `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
+          } else if (element.tagName === 'VIDEO') {
+            element.src = `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
+            element.controls = true;
+          } else if (element.tagName === 'AUDIO') {
+            element.src = `data:${getMimeType(mediaItem.type)};base64,${mediaItem.data}`;
+            element.controls = true;
+          } else if (element.style.backgroundImage) {
+            element.style.backgroundImage = `url(data:${getMimeType(mediaItem.type)};base64,${mediaItem.data})`;
+          }
         }
       }
     });
