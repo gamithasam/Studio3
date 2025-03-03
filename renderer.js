@@ -1907,9 +1907,327 @@ function rgbToHex(rgb) {
   
   const exportProgress = createExportProgressOverlay();
   
+  // Create resolution selector dialog
+  function createResolutionSelectorDialog() {
+    const overlay = document.createElement('div');
+    overlay.id = 'resolution-selector-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10000;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-family: sans-serif;
+    `;
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: #222;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 500px;
+      width: 90%;
+    `;
+    
+    const title = document.createElement('h3');
+    title.textContent = 'Select Export Resolution';
+    title.style.margin = '0 0 20px 0';
+    title.style.textAlign = 'center';
+    
+    const description = document.createElement('p');
+    description.textContent = 'Choose an aspect ratio and resolution for the exported PNG files:';
+    description.style.marginBottom = '20px';
+    
+    const optionsContainer = document.createElement('div');
+    optionsContainer.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    `;
+    
+    // Define common export resolutions
+    const resolutionOptions = [
+      { label: '16:9 Full HD (1920×1080)', width: 1920, height: 1080 },
+      { label: '16:9 HD (1280×720)', width: 1280, height: 720 },
+      { label: '4:3 XGA (1024×768)', width: 1024, height: 768 },
+      { label: '4:3 SXGA (1400×1050)', width: 1400, height: 1050 },
+      { label: '16:10 WXGA (1280×800)', width: 1280, height: 800 },
+      { label: 'Square (1080×1080)', width: 1080, height: 1080 }
+    ];
+    
+    // Last selected resolution (default to Full HD)
+    let selectedResolution = localStorage.getItem('exportResolution') ? 
+      JSON.parse(localStorage.getItem('exportResolution')) : 
+      { width: 1920, height: 1080 };
+    
+    // Create option buttons
+    resolutionOptions.forEach(option => {
+      const optionBtn = document.createElement('button');
+      optionBtn.textContent = option.label;
+      optionBtn.style.cssText = `
+        background: #333;
+        border: 2px solid #555;
+        color: white;
+        padding: 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        text-align: center;
+        transition: background 0.2s, border-color 0.2s;
+      `;
+      
+      // Highlight the selected option
+      if (selectedResolution.width === option.width && selectedResolution.height === option.height) {
+        optionBtn.style.background = '#4c7baf';
+        optionBtn.style.borderColor = '#6ca0e0';
+      }
+      
+      optionBtn.addEventListener('mouseenter', () => {
+        if (!(selectedResolution.width === option.width && selectedResolution.height === option.height)) {
+          optionBtn.style.background = '#444';
+        }
+      });
+      
+      optionBtn.addEventListener('mouseleave', () => {
+        if (!(selectedResolution.width === option.width && selectedResolution.height === option.height)) {
+          optionBtn.style.background = '#333';
+        }
+      });
+      
+      optionBtn.addEventListener('click', () => {
+        // Update selected state for all buttons
+        optionsContainer.querySelectorAll('button').forEach(btn => {
+          btn.style.background = '#333';
+          btn.style.borderColor = '#555';
+        });
+        
+        // Highlight this button
+        optionBtn.style.background = '#4c7baf';
+        optionBtn.style.borderColor = '#6ca0e0';
+        
+        // Update selected resolution
+        selectedResolution = { width: option.width, height: option.height };
+        
+        // If custom option, show the custom inputs
+        customInputs.style.display = 'none';
+      });
+      
+      optionsContainer.appendChild(optionBtn);
+    });
+    
+    // Add custom resolution option
+    const customOption = document.createElement('button');
+    customOption.textContent = 'Custom Resolution';
+    customOption.style.cssText = `
+      background: #333;
+      border: 2px solid #555;
+      color: white;
+      padding: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      grid-column: span 2;
+      transition: background 0.2s, border-color 0.2s;
+    `;
+    
+    customOption.addEventListener('mouseenter', () => {
+      if (!customInputs.style.display || customInputs.style.display === 'none') {
+        customOption.style.background = '#444';
+      }
+    });
+    
+    customOption.addEventListener('mouseleave', () => {
+      if (!customInputs.style.display || customInputs.style.display === 'none') {
+        customOption.style.background = '#333';
+      }
+    });
+    
+    customOption.addEventListener('click', () => {
+      // Update selected state for all buttons
+      optionsContainer.querySelectorAll('button').forEach(btn => {
+        btn.style.background = '#333';
+        btn.style.borderColor = '#555';
+      });
+      
+      // Highlight this button
+      customOption.style.background = '#4c7baf';
+      customOption.style.borderColor = '#6ca0e0';
+      
+      // Show custom inputs
+      customInputs.style.display = 'flex';
+      
+      // Focus on the width input
+      widthInput.focus();
+      
+      // Update selected resolution from input values
+      selectedResolution = { 
+        width: parseInt(widthInput.value) || 1920, 
+        height: parseInt(heightInput.value) || 1080 
+      };
+    });
+    
+    optionsContainer.appendChild(customOption);
+    
+    // Custom resolution inputs
+    const customInputs = document.createElement('div');
+    customInputs.style.cssText = `
+      display: none;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 10px;
+    `;
+    
+    // Width input
+    const widthLabel = document.createElement('label');
+    widthLabel.textContent = 'Width:';
+    widthLabel.style.flexBasis = '15%';
+    
+    const widthInput = document.createElement('input');
+    widthInput.type = 'number';
+    widthInput.min = '320';
+    widthInput.max = '3840';
+    widthInput.value = selectedResolution.width;
+    widthInput.style.cssText = `
+      flex: 1;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: #333;
+      color: white;
+    `;
+    
+    widthInput.addEventListener('input', () => {
+      selectedResolution.width = parseInt(widthInput.value) || 1920;
+    });
+    
+    // Height input
+    const heightLabel = document.createElement('label');
+    heightLabel.textContent = 'Height:';
+    heightLabel.style.flexBasis = '15%';
+    
+    const heightInput = document.createElement('input');
+    heightInput.type = 'number';
+    heightInput.min = '240';
+    heightInput.max = '2160';
+    heightInput.value = selectedResolution.height;
+    heightInput.style.cssText = `
+      flex: 1;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: #333;
+      color: white;
+    `;
+    
+    heightInput.addEventListener('input', () => {
+      selectedResolution.height = parseInt(heightInput.value) || 1080;
+    });
+    
+    customInputs.appendChild(widthLabel);
+    customInputs.appendChild(widthInput);
+    customInputs.appendChild(heightLabel);
+    customInputs.appendChild(heightInput);
+    
+    // Create action buttons
+    const actionButtons = document.createElement('div');
+    actionButtons.style.cssText = `
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    `;
+    
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Cancel';
+    cancelButton.style.cssText = `
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background: #444;
+      color: white;
+      cursor: pointer;
+    `;
+    
+    const confirmButton = document.createElement('button');
+    confirmButton.textContent = 'Export';
+    confirmButton.style.cssText = `
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background: #4CAF50;
+      color: white;
+      cursor: pointer;
+    `;
+    
+    actionButtons.appendChild(cancelButton);
+    actionButtons.appendChild(confirmButton);
+    
+    // Assemble dialog
+    dialog.appendChild(title);
+    dialog.appendChild(description);
+    dialog.appendChild(optionsContainer);
+    dialog.appendChild(customInputs);
+    dialog.appendChild(actionButtons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // Return control handlers
+    return {
+      show: (outputDir) => {
+        return new Promise((resolve, reject) => {
+          overlay.style.display = 'flex';
+          
+          cancelButton.onclick = () => {
+            overlay.style.display = 'none';
+            resolve(null);
+          };
+          
+          confirmButton.onclick = () => {
+            overlay.style.display = 'none';
+            
+            // Save selected resolution for next time
+            localStorage.setItem('exportResolution', JSON.stringify(selectedResolution));
+            
+            resolve({
+              outputDir,
+              width: selectedResolution.width,
+              height: selectedResolution.height
+            });
+          };
+          
+          // Check if a custom resolution was previously selected
+          if (!resolutionOptions.some(option => 
+            option.width === selectedResolution.width && 
+            option.height === selectedResolution.height)
+          ) {
+            customOption.click();
+          }
+        });
+      },
+      hide: () => { overlay.style.display = 'none'; }
+    };
+  }
+  
+  const resolutionSelector = createResolutionSelectorDialog();
+  
   // Handle export to PNG
   window.electronAPI.onExportToPNG(async ({ outputDir }) => {
     try {
+      // First, show the resolution selector
+      const exportConfig = await resolutionSelector.show(outputDir);
+      
+      // If user canceled, exit early
+      if (!exportConfig) return;
+      
       // Show export progress overlay
       exportProgress.show();
       exportProgress.updateProgress(0, 'Initializing export...');
@@ -1918,9 +2236,13 @@ function rgbToHex(rgb) {
       const editorContent = originalCode;
       const mediaData = projectManager.getAllMediaData();
       
-      // Initialize the export renderer with 1920x1080 Full HD dimensions
+      // Initialize the export renderer with selected dimensions
       const exporter = new ExportRenderer();
-      exporter.initialize(1920, 1080);
+      exporter.initialize(exportConfig.width, exportConfig.height);
+      
+      // Log export resolution
+      console.log(`Exporting slides at ${exportConfig.width}×${exportConfig.height}`);
+      exportProgress.updateProgress(5, `Preparing ${exportConfig.width}×${exportConfig.height} export...`);
       
       // Load slides data
       const slideCount = exporter.loadSlideData(editorContent, mediaData);
@@ -1939,7 +2261,7 @@ function rgbToHex(rgb) {
       // Save all slides to the output directory
       exportProgress.updateProgress(95, 'Saving files...');
       
-      const successCount = await saveExportedSlides(slides, outputDir);
+      const successCount = await saveExportedSlides(slides, exportConfig.outputDir);
       
       // Clean up export renderer resources
       exporter.destroy();

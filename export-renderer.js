@@ -84,7 +84,7 @@ class ExportRenderer {
     this.camera = new THREE.PerspectiveCamera(75, this.width / this.height, 0.1, 100);
     this.camera.position.z = 3;
     
-    // Add a debug indicator
+    // Add a debug indicator with dimensions
     this.debugIndicator = document.createElement('div');
     this.debugIndicator.style.cssText = `
       position: absolute;
@@ -97,7 +97,7 @@ class ExportRenderer {
       font-size: 12px;
       z-index: 100000;
     `;
-    this.debugIndicator.textContent = 'EXPORT MODE';
+    this.debugIndicator.textContent = `EXPORT ${this.width}×${this.height}`;
     this.renderContainer.appendChild(this.debugIndicator);
     
     return this;
