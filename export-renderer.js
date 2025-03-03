@@ -1,12 +1,12 @@
 /**
  * Export Renderer for Animotion
- * Ultra-simplified approach using direct document screenshots
+ * Uses Electron's native screenshot capability for exact exports
  */
 
 class ExportRenderer {
   constructor() {
-    this.width = 1920; // Default export width (Full HD)
-    this.height = 1080; // Default export height (16:9 ratio)
+    this.width = 1920;
+    this.height = 1080;
     this.slideData = [];
     this.mediaData = [];
     this.renderingSpace = null;
@@ -14,6 +14,7 @@ class ExportRenderer {
     this.renderer = null;
     this.scene = null;
     this.camera = null;
+    this.electronCapture = 'electron' in window;
   }
 
   /**
@@ -84,8 +85,9 @@ class ExportRenderer {
     this.camera = new THREE.PerspectiveCamera(75, this.width / this.height, 0.1, 100);
     this.camera.position.z = 3;
     
-    // Add a debug indicator with dimensions
+    // Add a small indicator label during export (will be removed in final screenshots)
     this.debugIndicator = document.createElement('div');
+    this.debugIndicator.id = 'debug-indicator';
     this.debugIndicator.style.cssText = `
       position: absolute;
       bottom: 10px;
@@ -164,8 +166,10 @@ class ExportRenderer {
         }
       });
       
-      // Show the rendering space
+      // Show the rendering space and make it fully visible
       this.renderingSpace.style.display = 'block';
+      this.renderingSpace.style.opacity = '1';
+      this.renderingSpace.style.visibility = 'visible';
       
       // Create a slide container
       const slideContainer = document.createElement('div');
@@ -176,6 +180,9 @@ class ExportRenderer {
         width: 100%;
         height: 100%;
         pointer-events: none;
+        overflow: visible;
+        opacity: 1;
+        visibility: visible;
       `;
       this.renderContainer.appendChild(slideContainer);
       
@@ -193,28 +200,93 @@ class ExportRenderer {
       // Run the transition in animation to show all elements
       if (slide.transitionIn) {
         console.log('Running transitionIn...');
-        slide.transitionIn(slideState);
-        
-        // Force-complete all animations immediately
-        gsap.globalTimeline.timeScale(100);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        gsap.globalTimeline.timeScale(1);
+        try {
+          slide.transitionIn(slideState);
+          
+          // Force-complete all animations immediately
+          gsap.globalTimeline.timeScale(100);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Increased timeout
+          gsap.globalTimeline.timeScale(1);
+        } catch (e) {
+          console.error('Error during transition:', e);
+        }
       }
       
-      // Ensure all elements are visible
+      // Ensure all elements are visible with extra checks
+      console.log('Ensuring all elements are visible...');
       this.ensureVisibility(slideContainer);
       
       // Render the 3D scene once
       console.log('Rendering 3D scene...');
       this.renderer.render(this.scene, this.camera);
       
-      // Wait for any remaining rendering to complete
+      // Wait for any remaining rendering to complete - longer timeout
       console.log('Waiting for stable render...');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Hide the debug indicator for the final screenshot
+      if (this.debugIndicator) {
+        this.debugIndicator.style.display = 'none';
+      }
       
       // Take a screenshot of the rendering container
       console.log('Taking screenshot...');
-      const screenshot = await this.captureScreenshot();
+      
+      // Always try Electron screenshot first, and make multiple attempts if needed
+      let screenshot = null;
+      if (window.electronAPI && window.electronAPI.captureElement) {
+        try {
+          console.log('Using Electron native screenshot - attempt 1');
+          
+          // Give the DOM a moment to fully render
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          const rect = this.renderContainer.getBoundingClientRect();
+          console.log(`Capture rect: x=${rect.left}, y=${rect.top}, w=${rect.width}, h=${rect.height}`);
+          
+          const captureRect = {
+            x: Math.round(rect.left),
+            y: Math.round(rect.top),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          };
+          
+          screenshot = await window.electronAPI.captureElement(captureRect);
+          console.log('Electron screenshot successful');
+        } catch (err) {
+          console.error('First Electron screenshot attempt failed:', err);
+          
+          // Try once more with a slight delay
+          try {
+            console.log('Using Electron native screenshot - attempt 2');
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            const rect = this.renderContainer.getBoundingClientRect();
+            const captureRect = {
+              x: Math.round(rect.left),
+              y: Math.round(rect.top),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height)
+            };
+            
+            screenshot = await window.electronAPI.captureElement(captureRect);
+            console.log('Second electron screenshot attempt successful');
+          } catch (err2) {
+            console.error('Both Electron screenshot attempts failed:', err2);
+          }
+        }
+      }
+      
+      // If Electron screenshot failed, try canvas methods as fallback
+      if (!screenshot) {
+        console.log('Falling back to canvas methods');
+        screenshot = await this.captureScreenshot();
+      }
+      
+      // Show the debug indicator again for next slides
+      if (this.debugIndicator) {
+        this.debugIndicator.style.display = 'block';
+      }
       
       return screenshot;
     } catch (error) {
@@ -228,7 +300,7 @@ class ExportRenderer {
       gsap.globalTimeline.clear();
     }
   }
-  
+
   /**
    * Process any media references in elements
    */
@@ -274,23 +346,50 @@ class ExportRenderer {
   ensureVisibility(container) {
     // Force all elements to be visible
     const allElements = container.querySelectorAll('*');
+    console.log(`Ensuring visibility for ${allElements.length} elements`);
+    
     allElements.forEach(el => {
-      // Force full opacity and visibility
-      el.style.setProperty('opacity', '1', 'important');
-      el.style.setProperty('visibility', 'visible', 'important');
-      
-      // Make sure nothing is hidden
-      const computedStyle = window.getComputedStyle(el);
-      if (computedStyle.display === 'none') {
-        if (el.tagName === 'SPAN') {
-          el.style.setProperty('display', 'inline', 'important');
-        } else {
-          el.style.setProperty('display', 'block', 'important');
+      try {
+        // Force full opacity and visibility
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+        el.style.setProperty('display', el.tagName === 'SPAN' ? 'inline-block' : 'block', 'important');
+        
+        // Make sure textContent is visible for text elements
+        if (el.textContent && !el.children.length) {
+          const style = window.getComputedStyle(el);
+          
+          // Make sure text has reasonable color contrast
+          if (style.color === 'transparent' || style.color === 'rgba(0, 0, 0, 0)') {
+            el.style.setProperty('color', '#ffffff', 'important');
+          }
+          
+          // Make sure font-size is reasonable
+          if (parseInt(style.fontSize) < 1) {
+            el.style.setProperty('font-size', '16px', 'important');
+          }
         }
+        
+        // Make sure nothing is clipped or hidden
+        el.style.setProperty('overflow', 'visible', 'important');
+        el.style.setProperty('clip', 'auto', 'important');
+        el.style.setProperty('transform', 'none', 'important');
+        
+      } catch (err) {
+        console.warn(`Could not ensure visibility for element: ${el.tagName}`, err);
       }
     });
+    
+    // Additional check - force all H1, H2, P, DIV, SPAN to be explicitly visible
+    const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div, span, li');
+    textElements.forEach(el => {
+      el.style.setProperty('opacity', '1', 'important');
+      el.style.setProperty('visibility', 'visible', 'important');
+      el.style.setProperty('display', 'block', 'important');
+      el.style.setProperty('color', el.style.color || '#ffffff', 'important');
+    });
   }
-  
+
   /**
    * Capture a screenshot of the current render
    */
@@ -316,29 +415,9 @@ class ExportRenderer {
         }
       }
       
-      // Second attempt: Use createImageBitmap + canvas approach
-      try {
-        console.log('Using createImageBitmap approach');
-        
-        // Get screenshot using browser's built-in capabilities if available
-        if (window.createImageBitmap) {
-          const bitmap = await createImageBitmap(this.renderContainer);
-          
-          const canvas = document.createElement('canvas');
-          canvas.width = this.width;
-          canvas.height = this.height;
-          const ctx = canvas.getContext('2d');
-          
-          ctx.drawImage(bitmap, 0, 0);
-          bitmap.close();
-          
-          return canvas.toDataURL('image/png');
-        }
-      } catch (error) {
-        console.error('createImageBitmap approach failed:', error);
-      }
-      
-      // Last resort: Use canvas drawImage directly
+      // Skip the createImageBitmap approach since it doesn't work with DOM elements
+      // and go straight to manual canvas capture
+      console.log('Using manual canvas capture approach');
       return this.captureCanvasScreenshot();
     } catch (error) {
       console.error('All screenshot methods failed:', error);
@@ -351,62 +430,171 @@ class ExportRenderer {
    * Create screenshot by drawing elements to canvas manually
    */
   captureCanvasScreenshot() {
-    console.log('Using manual canvas capture approach');
+    console.log('Starting manual canvas capture');
     
+    // Create canvas with exact dimensions
     const canvas = document.createElement('canvas');
     canvas.width = this.width;
     canvas.height = this.height;
     const ctx = canvas.getContext('2d');
     
-    // First, draw the WebGL canvas
-    ctx.drawImage(this.renderer.domElement, 0, 0);
+    // Clear with black background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Then try to draw HTML elements recursively
-    this.drawElementsToCanvas(this.renderContainer, ctx);
+    try {
+      // Try a more direct approach - render the Three.js scene directly to our canvas
+      console.log('Drawing WebGL scene directly');
+      this.renderer.render(this.scene, this.camera);
+      const threeCanvas = this.renderer.domElement;
+      
+      // Draw the Three.js canvas content to our export canvas
+      ctx.drawImage(threeCanvas, 0, 0, canvas.width, canvas.height);
+      
+      // Add attempt to screenshot with html2canvas - this can sometimes work better
+      if (window.html2canvas) {
+        window.html2canvas(this.renderContainer, {
+          canvas: canvas,
+          backgroundColor: null,
+          useCORS: true,
+          logging: true,
+          removeContainer: false,
+        }).catch(err => console.log('Secondary html2canvas failed:', err));
+      }
+      
+      // Then try to draw HTML elements on top
+      this.drawElementsToCanvas(this.renderContainer, ctx);
+      
+    } catch (e) {
+      console.error('Error during canvas capture:', e);
+    }
     
+    // Final step - try to grab pixel data from the render container directly
+    try {
+      // Position the canvas element exactly over the render container
+      const rect = this.renderContainer.getBoundingClientRect();
+      canvas.style.position = 'absolute';
+      canvas.style.top = rect.top + 'px';
+      canvas.style.left = rect.left + 'px';
+      canvas.style.zIndex = '999999';
+      document.body.appendChild(canvas);
+      
+      // Let the browser render one more frame with our canvas
+      setTimeout(() => {
+        document.body.removeChild(canvas);
+      }, 100);
+      
+    } catch (e) {
+      console.error('Error during final canvas positioning:', e);
+    }
+    
+    console.log('Manual canvas capture completed');
     return canvas.toDataURL('image/png');
   }
   
   /**
-   * Draw HTML elements to canvas - simplified version
+   * Draw HTML elements to canvas - improved version
    */
   drawElementsToCanvas(element, ctx) {
-    // Simple draw function that only handles text and rectangles
-    const elems = element.querySelectorAll('*');
+    console.log('Drawing HTML elements to canvas');
     
-    elems.forEach(el => {
-      const rect = el.getBoundingClientRect();
-      const containerRect = this.renderContainer.getBoundingClientRect();
+    // Draw backgrounds and text of all elements
+    const traverseElements = (el, parentOpacity = 1) => {
+      if (!el || !el.childNodes) return;
       
-      // Calculate position relative to container
-      const x = rect.left - containerRect.left;
-      const y = rect.top - containerRect.top;
-      const w = rect.width;
-      const h = rect.height;
-      
-      // Skip elements outside the container or with no dimensions
-      if (w <= 0 || h <= 0 || 
-          x + w < 0 || y + h < 0 || 
-          x > this.width || y > this.height) {
-        return;
+      // Process element itself if it's an element node
+      if (el.nodeType === 1) { // ELEMENT_NODE
+        const rect = el.getBoundingClientRect();
+        const containerRect = this.renderContainer.getBoundingClientRect();
+        
+        // Calculate position relative to container
+        const x = rect.left - containerRect.left;
+        const y = rect.top - containerRect.top;
+        const w = rect.width;
+        const h = rect.height;
+        
+        // Skip elements outside the container or with no dimensions
+        if (w <= 0 || h <= 0 || x + w < 0 || y + h < 0 || x > this.width || y > this.height) {
+          return;
+        }
+        
+        const style = window.getComputedStyle(el);
+        const opacity = parseFloat(style.opacity) * parentOpacity;
+        
+        // Skip completely transparent elements
+        if (opacity <= 0) return;
+        
+        // Set global alpha for this element
+        ctx.globalAlpha = opacity;
+        
+        // Draw background if it has one
+        if (style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+          try {
+            ctx.fillStyle = style.backgroundColor;
+            ctx.fillRect(x, y, w, h);
+          } catch (e) {
+            console.error('Error drawing background:', e);
+          }
+        }
+        
+        // Draw borders if present
+        if (parseInt(style.borderWidth) > 0 && style.borderStyle !== 'none') {
+          try {
+            ctx.strokeStyle = style.borderColor;
+            ctx.lineWidth = parseInt(style.borderWidth);
+            ctx.strokeRect(x, y, w, h);
+          } catch (e) {
+            console.error('Error drawing border:', e);
+          }
+        }
+        
+        // Draw text content if it's a text element with no children
+        if (el.textContent && !el.hasChildNodes()) {
+          try {
+            const fontSize = parseInt(style.fontSize);
+            const fontFamily = style.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+            
+            ctx.fillStyle = style.color;
+            ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}, sans-serif`;
+            ctx.textBaseline = 'top';
+            
+            let textX = x;
+            // Handle text alignment
+            if (style.textAlign === 'center') {
+              textX += w / 2;
+              ctx.textAlign = 'center';
+            } else if (style.textAlign === 'right') {
+              textX += w;
+              ctx.textAlign = 'right';
+            } else {
+              ctx.textAlign = 'left';
+            }
+            
+            // Apply padding
+            const paddingLeft = parseInt(style.paddingLeft) || 0;
+            const paddingTop = parseInt(style.paddingTop) || 0;
+            
+            ctx.fillText(el.textContent, textX + paddingLeft, y + paddingTop);
+          } catch (e) {
+            console.error('Error drawing text:', e);
+          }
+        }
       }
       
-      const style = window.getComputedStyle(el);
-      
-      // Draw background if it has one
-      if (style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-        ctx.fillStyle = style.backgroundColor;
-        ctx.fillRect(x, y, w, h);
-      }
-      
-      // Draw text content if it's a simple text element
-      if (el.textContent && !el.children.length) {
-        ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-        ctx.fillStyle = style.color;
-        ctx.textBaseline = 'top';
-        ctx.fillText(el.textContent, x, y);
-      }
-    });
+      // Recursively process children
+      Array.from(el.childNodes).forEach(child => {
+        if (child.nodeType === 1) { // Only process element nodes
+          const style = window.getComputedStyle(el);
+          traverseElements(child, parseFloat(style.opacity) * parentOpacity);
+        }
+      });
+    };
+    
+    // Start traversal from the container
+    traverseElements(element);
+    
+    // Reset global alpha
+    ctx.globalAlpha = 1;
   }
   
   /**

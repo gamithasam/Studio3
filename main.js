@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, desktopCapturer } = require('electron');
 const path = require('path');
 const fontList = require('font-list');
 const fs = require('fs');
@@ -305,5 +305,82 @@ ipcMain.handle('save-exported-png', async (event, { filePath, data }) => {
   } catch (error) {
     console.error('Error saving PNG:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Improve the screen capture IPC handler with better error handling and timeouts
+ipcMain.handle('capture-element', async (event, rect) => {
+  try {
+    console.log(`Capturing element at x:${rect.x}, y:${rect.y}, width:${rect.width}, height:${rect.height}`);
+    
+    // Get the source window
+    const win = BrowserWindow.fromWebContents(event.sender);
+    
+    if (!win) {
+      throw new Error('Could not find window for screenshot');
+    }
+    
+    // Make sure window is fully rendered with a longer timeout
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Take a native screenshot using capturePage with explicit bounds
+    console.log(`Capturing with rect: ${JSON.stringify(rect)}`);
+    const image = await win.webContents.capturePage({
+      x: Math.max(0, rect.x),
+      y: Math.max(0, rect.y),
+      width: Math.min(rect.width, win.getBounds().width),
+      height: Math.min(rect.height, win.getBounds().height)
+    });
+    
+    if (!image) {
+      throw new Error('Capture returned null image');
+    }
+    
+    if (image.isEmpty()) {
+      throw new Error('Captured image is empty');
+    }
+    
+    const size = image.getSize();
+    console.log(`Screenshot captured successfully: ${size.width}x${size.height}`);
+    
+    // Convert to PNG data URL
+    const pngBuffer = image.toPNG();
+    if (!pngBuffer || pngBuffer.length === 0) {
+      throw new Error('PNG conversion failed');
+    }
+    
+    const dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+    return dataUrl;
+  } catch (error) {
+    console.error('Error capturing element:', error);
+    
+    // Try again with a different approach - capture the entire window first
+    try {
+      console.log('Trying full window capture as fallback');
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const image = await win.webContents.capturePage();
+      
+      const size = image.getSize();
+      console.log(`Full window capture: ${size.width}x${size.height}`);
+      
+      // Now crop to the desired region
+      const nativeImage = require('electron').nativeImage;
+      const croppedImage = nativeImage.createFromBuffer(
+        image.toBitmap(), {
+          width: size.width,
+          height: size.height
+        }
+      ).crop({
+        x: Math.max(0, rect.x),
+        y: Math.max(0, rect.y),
+        width: Math.min(rect.width, size.width - rect.x),
+        height: Math.min(rect.height, size.height - rect.y)
+      });
+      
+      return `data:image/png;base64,${croppedImage.toPNG().toString('base64')}`;
+    } catch (fallbackError) {
+      console.error('Fallback capture also failed:', fallbackError);
+      throw error; // throw original error
+    }
   }
 });

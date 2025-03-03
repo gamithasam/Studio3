@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectMediaFiles: () => ipcRenderer.invoke('select-media-files'),
   saveExportedPNG: (filePath, data) => ipcRenderer.invoke('save-exported-png', { filePath, data }),
   
+  // Screenshot capture
+  captureElement: (rect) => ipcRenderer.invoke('capture-element', rect),
+  
   // Event listeners
   onNewProject: (callback) => ipcRenderer.on('new-project', callback),
   onProjectOpened: (callback) => ipcRenderer.on('project-opened', (_, value) => callback(value)),
