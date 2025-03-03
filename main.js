@@ -107,6 +107,25 @@ function createMenu() {
           }
         },
         { type: 'separator' },
+        {
+          label: 'Export',
+          submenu: [
+            {
+              label: 'Export to PNG',
+              click: async () => {
+                // Prompt for a directory to save the exported PNG files
+                const { canceled, filePaths } = await dialog.showOpenDialog({
+                  properties: ['openDirectory', 'createDirectory']
+                });
+                
+                if (!canceled && filePaths.length > 0) {
+                  mainWindow.webContents.send('export-to-png', { outputDir: filePaths[0] });
+                }
+              }
+            }
+          ]
+        },
+        { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' }
       ]
     },
@@ -271,4 +290,20 @@ ipcMain.handle('select-media-files', async () => {
   }
   
   return { canceled: false, mediaFiles };
+});
+
+// Add a new IPC handler for saving exported PNG files
+ipcMain.handle('save-exported-png', async (event, { filePath, data }) => {
+  try {
+    // Remove the data URL prefix to get just the base64 data
+    const base64Data = data.replace(/^data:image\/png;base64,/, '');
+    
+    // Write the file to disk
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('Error saving PNG:', error);
+    return { success: false, error: error.message };
+  }
 });

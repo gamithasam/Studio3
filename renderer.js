@@ -4,6 +4,7 @@ import { Water } from 'three/addons/objects/Water.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import ProjectManager from './project-manager.js';
 import MediaAutocompleteProvider from './media-autocomplete.js';
+import ExportRenderer from './export-renderer.js';
 
 window.Water = Water;
 window.Sky = Sky;
@@ -1827,6 +1828,161 @@ function rgbToHex(rgb) {
 
   // Initialize the media autocomplete provider when editor is ready
   mediaAutocompleteProvider = new MediaAutocompleteProvider(monaco, projectManager);
+
+  // Create export progress overlay
+  function createExportProgressOverlay() {
+    const overlay = document.createElement('div');
+    overlay.id = 'export-progress-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10000;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-family: sans-serif;
+    `;
+    
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: #222;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 400px;
+      width: 80%;
+      text-align: center;
+    `;
+    
+    const title = document.createElement('h3');
+    title.textContent = 'Exporting Slides';
+    title.style.margin = '0 0 20px 0';
+    
+    const message = document.createElement('div');
+    message.id = 'export-message';
+    message.textContent = 'Preparing...';
+    message.style.marginBottom = '15px';
+    
+    const progressContainer = document.createElement('div');
+    progressContainer.style.cssText = `
+      background: #333;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 15px;
+    `;
+    
+    const progressBar = document.createElement('div');
+    progressBar.id = 'export-progress-bar';
+    progressBar.style.cssText = `
+      height: 100%;
+      width: 0%;
+      background: #4CAF50;
+      transition: width 0.3s ease;
+    `;
+    
+    progressContainer.appendChild(progressBar);
+    
+    content.appendChild(title);
+    content.appendChild(message);
+    content.appendChild(progressContainer);
+    
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+    
+    return {
+      show: () => { overlay.style.display = 'flex'; },
+      hide: () => { overlay.style.display = 'none'; },
+      updateProgress: (percent, msg) => {
+        progressBar.style.width = `${percent}%`;
+        if (msg) message.textContent = msg;
+      }
+    };
+  }
+  
+  const exportProgress = createExportProgressOverlay();
+  
+  // Handle export to PNG
+  window.electronAPI.onExportToPNG(async ({ outputDir }) => {
+    try {
+      // Show export progress overlay
+      exportProgress.show();
+      exportProgress.updateProgress(0, 'Initializing export...');
+      
+      // Get current editor content and media data
+      const editorContent = originalCode;
+      const mediaData = projectManager.getAllMediaData();
+      
+      // Initialize the export renderer with 1920x1080 Full HD dimensions
+      const exporter = new ExportRenderer();
+      exporter.initialize(1920, 1080);
+      
+      // Load slides data
+      const slideCount = exporter.loadSlideData(editorContent, mediaData);
+      if (slideCount === 0) {
+        throw new Error('No slides found in the presentation.');
+      }
+      
+      exportProgress.updateProgress(10, `Found ${slideCount} slides to export.`);
+      
+      // Export all slides with progress updates
+      const slides = await exporter.exportAllSlides(progress => {
+        const percent = 10 + ((progress.current / progress.total) * 85);
+        exportProgress.updateProgress(percent, progress.message);
+      });
+      
+      // Save all slides to the output directory
+      exportProgress.updateProgress(95, 'Saving files...');
+      
+      const successCount = await saveExportedSlides(slides, outputDir);
+      
+      // Clean up export renderer resources
+      exporter.destroy();
+      
+      // Show success message with file count
+      exportProgress.updateProgress(100, `Successfully exported ${successCount} slides!`);
+      setTimeout(() => {
+        exportProgress.hide();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      exportProgress.updateProgress(100, `Error: ${error.message}`);
+      setTimeout(() => {
+        exportProgress.hide();
+      }, 3000);
+    }
+  });
+  
+  // Helper function to save exported slides to disk
+  async function saveExportedSlides(slides, outputDir) {
+    let successCount = 0;
+    
+    for (const slide of slides) {
+      if (slide.success) {
+        const fileName = `slide_${String(slide.index + 1).padStart(2, '0')}.png`;
+        const filePath = `${outputDir}/${fileName}`;
+        
+        try {
+          const result = await window.electronAPI.saveExportedPNG(filePath, slide.data);
+          if (result.success) {
+            successCount++;
+          } else {
+            console.error(`Failed to save slide ${slide.index + 1}: ${result.error}`);
+          }
+        } catch (error) {
+          console.error(`Error saving slide ${slide.index + 1}:`, error);
+        }
+      }
+    }
+    
+    return successCount;
+  }
 });
 
 // Add window focus/blur events to optimize performance
