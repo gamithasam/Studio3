@@ -308,7 +308,7 @@ ipcMain.handle('save-exported-png', async (event, { filePath, data }) => {
   }
 });
 
-// Improve the screen capture IPC handler with better error handling and timeouts
+// Simplify the screen capture handler
 ipcMain.handle('capture-element', async (event, rect) => {
   try {
     console.log(`Capturing element at x:${rect.x}, y:${rect.y}, width:${rect.width}, height:${rect.height}`);
@@ -320,67 +320,50 @@ ipcMain.handle('capture-element', async (event, rect) => {
       throw new Error('Could not find window for screenshot');
     }
     
-    // Make sure window is fully rendered with a longer timeout
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Short wait to ensure render is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    // Take a native screenshot using capturePage with explicit bounds
-    console.log(`Capturing with rect: ${JSON.stringify(rect)}`);
+    // Take a direct screenshot with no intermediate steps
     const image = await win.webContents.capturePage({
-      x: Math.max(0, rect.x),
-      y: Math.max(0, rect.y),
-      width: Math.min(rect.width, win.getBounds().width),
-      height: Math.min(rect.height, win.getBounds().height)
+      x: Math.max(0, Math.floor(rect.x)),
+      y: Math.max(0, Math.floor(rect.y)),
+      width: Math.min(Math.ceil(rect.width), win.getBounds().width),
+      height: Math.min(Math.ceil(rect.height), win.getBounds().height)
     });
     
-    if (!image) {
-      throw new Error('Capture returned null image');
-    }
-    
-    if (image.isEmpty()) {
+    if (!image || image.isEmpty()) {
       throw new Error('Captured image is empty');
     }
     
     const size = image.getSize();
     console.log(`Screenshot captured successfully: ${size.width}x${size.height}`);
     
-    // Convert to PNG data URL
-    const pngBuffer = image.toPNG();
-    if (!pngBuffer || pngBuffer.length === 0) {
-      throw new Error('PNG conversion failed');
-    }
-    
-    const dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-    return dataUrl;
+    // Return as data URL
+    return `data:image/png;base64,${image.toPNG().toString('base64')}`;
   } catch (error) {
     console.error('Error capturing element:', error);
     
-    // Try again with a different approach - capture the entire window first
+    // Try again with a different approach
     try {
-      console.log('Trying full window capture as fallback');
+      // Fallback to full window capture and crop
       const win = BrowserWindow.fromWebContents(event.sender);
       const image = await win.webContents.capturePage();
       
-      const size = image.getSize();
-      console.log(`Full window capture: ${size.width}x${size.height}`);
-      
-      // Now crop to the desired region
+      // Crop to the desired region
       const nativeImage = require('electron').nativeImage;
       const croppedImage = nativeImage.createFromBuffer(
-        image.toBitmap(), {
-          width: size.width,
-          height: size.height
-        }
+        image.toBitmap(), { width: image.getSize().width, height: image.getSize().height }
       ).crop({
         x: Math.max(0, rect.x),
         y: Math.max(0, rect.y),
-        width: Math.min(rect.width, size.width - rect.x),
-        height: Math.min(rect.height, size.height - rect.y)
+        width: Math.min(rect.width, image.getSize().width - rect.x),
+        height: Math.min(rect.height, image.getSize().height - rect.y)
       });
       
       return `data:image/png;base64,${croppedImage.toPNG().toString('base64')}`;
     } catch (fallbackError) {
       console.error('Fallback capture also failed:', fallbackError);
-      throw error; // throw original error
+      throw error;
     }
   }
 });

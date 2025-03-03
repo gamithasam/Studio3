@@ -166,12 +166,10 @@ class ExportRenderer {
         }
       });
       
-      // Show the rendering space and make it fully visible
+      // Show the rendering space
       this.renderingSpace.style.display = 'block';
-      this.renderingSpace.style.opacity = '1';
-      this.renderingSpace.style.visibility = 'visible';
       
-      // Create a slide container
+      // Create a slide container - keep it simple without added styles
       const slideContainer = document.createElement('div');
       slideContainer.style.cssText = `
         position: absolute;
@@ -181,8 +179,6 @@ class ExportRenderer {
         height: 100%;
         pointer-events: none;
         overflow: visible;
-        opacity: 1;
-        visibility: visible;
       `;
       this.renderContainer.appendChild(slideContainer);
       
@@ -205,81 +201,47 @@ class ExportRenderer {
           
           // Force-complete all animations immediately
           gsap.globalTimeline.timeScale(100);
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Increased timeout
+          await new Promise(resolve => setTimeout(resolve, 1000));
           gsap.globalTimeline.timeScale(1);
         } catch (e) {
           console.error('Error during transition:', e);
         }
       }
       
-      // Ensure all elements are visible with extra checks
-      console.log('Ensuring all elements are visible...');
-      this.ensureVisibility(slideContainer);
+      // Make sure all elements have maximum visibility without changing positions
+      this.ensureAllElementsVisible(slideContainer);
       
-      // Render the 3D scene once
+      // Render the 3D scene
       console.log('Rendering 3D scene...');
       this.renderer.render(this.scene, this.camera);
       
-      // Wait for any remaining rendering to complete - longer timeout
+      // Wait for rendering to stabilize naturally, but don't modify the DOM structure
       console.log('Waiting for stable render...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Hide the debug indicator for the final screenshot
+      // Hide the debug indicator for the screenshot
       if (this.debugIndicator) {
         this.debugIndicator.style.display = 'none';
       }
       
-      // Take a screenshot of the rendering container
+      // Take the screenshot without any DOM modifications
       console.log('Taking screenshot...');
-      
-      // Always try Electron screenshot first, and make multiple attempts if needed
       let screenshot = null;
-      if (window.electronAPI && window.electronAPI.captureElement) {
-        try {
-          console.log('Using Electron native screenshot - attempt 1');
-          
-          // Give the DOM a moment to fully render
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          const rect = this.renderContainer.getBoundingClientRect();
-          console.log(`Capture rect: x=${rect.left}, y=${rect.top}, w=${rect.width}, h=${rect.height}`);
-          
-          const captureRect = {
-            x: Math.round(rect.left),
-            y: Math.round(rect.top),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height)
-          };
-          
-          screenshot = await window.electronAPI.captureElement(captureRect);
-          console.log('Electron screenshot successful');
-        } catch (err) {
-          console.error('First Electron screenshot attempt failed:', err);
-          
-          // Try once more with a slight delay
-          try {
-            console.log('Using Electron native screenshot - attempt 2');
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            const rect = this.renderContainer.getBoundingClientRect();
-            const captureRect = {
-              x: Math.round(rect.left),
-              y: Math.round(rect.top),
-              width: Math.round(rect.width),
-              height: Math.round(rect.height)
-            };
-            
-            screenshot = await window.electronAPI.captureElement(captureRect);
-            console.log('Second electron screenshot attempt successful');
-          } catch (err2) {
-            console.error('Both Electron screenshot attempts failed:', err2);
-          }
-        }
-      }
       
-      // If Electron screenshot failed, try canvas methods as fallback
-      if (!screenshot) {
-        console.log('Falling back to canvas methods');
+      try {
+        console.log('Using Electron native screenshot');
+        const rect = this.renderContainer.getBoundingClientRect();
+        console.log(`Capture rect: x=${rect.left}, y=${rect.top}, w=${rect.width}, h=${rect.height}`);
+        
+        screenshot = await window.electronAPI.captureElement({
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        });
+        console.log('Screenshot captured successfully');
+      } catch (err) {
+        console.error('Screenshot capture failed:', err);
         screenshot = await this.captureScreenshot();
       }
       
@@ -341,91 +303,50 @@ class ExportRenderer {
   }
   
   /**
-   * Make sure everything is fully visible
+   * Ensure all elements are visible without changing positions
    */
-  ensureVisibility(container) {
-    // Force all elements to be visible
+  ensureAllElementsVisible(container) {
+    // Simple visibility fixes without position changes
     const allElements = container.querySelectorAll('*');
-    console.log(`Ensuring visibility for ${allElements.length} elements`);
-    
     allElements.forEach(el => {
-      try {
-        // Force full opacity and visibility
-        el.style.setProperty('opacity', '1', 'important');
-        el.style.setProperty('visibility', 'visible', 'important');
-        el.style.setProperty('display', el.tagName === 'SPAN' ? 'inline-block' : 'block', 'important');
-        
-        // Make sure textContent is visible for text elements
-        if (el.textContent && !el.children.length) {
-          const style = window.getComputedStyle(el);
-          
-          // Make sure text has reasonable color contrast
-          if (style.color === 'transparent' || style.color === 'rgba(0, 0, 0, 0)') {
-            el.style.setProperty('color', '#ffffff', 'important');
-          }
-          
-          // Make sure font-size is reasonable
-          if (parseInt(style.fontSize) < 1) {
-            el.style.setProperty('font-size', '16px', 'important');
-          }
+      // Only set opacity and visibility but don't change positioning
+      el.style.opacity = '1';
+      el.style.visibility = 'visible';
+      
+      // For text elements with no color, ensure they're visible
+      if (el.textContent && el.textContent.trim() && !el.children.length) {
+        const style = window.getComputedStyle(el);
+        if (style.color === 'transparent' || style.color === 'rgba(0, 0, 0, 0)') {
+          el.style.color = '#ffffff';
         }
-        
-        // Make sure nothing is clipped or hidden
-        el.style.setProperty('overflow', 'visible', 'important');
-        el.style.setProperty('clip', 'auto', 'important');
-        el.style.setProperty('transform', 'none', 'important');
-        
-      } catch (err) {
-        console.warn(`Could not ensure visibility for element: ${el.tagName}`, err);
       }
-    });
-    
-    // Additional check - force all H1, H2, P, DIV, SPAN to be explicitly visible
-    const textElements = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div, span, li');
-    textElements.forEach(el => {
-      el.style.setProperty('opacity', '1', 'important');
-      el.style.setProperty('visibility', 'visible', 'important');
-      el.style.setProperty('display', 'block', 'important');
-      el.style.setProperty('color', el.style.color || '#ffffff', 'important');
     });
   }
 
   /**
-   * Capture a screenshot of the current render
+   * Capture a screenshot of the current render - simplified version
    */
   async captureScreenshot() {
     try {
-      // First attempt: Use html2canvas if available
       if (window.html2canvas) {
-        try {
-          console.log('Using html2canvas for screenshot');
-          const canvas = await html2canvas(this.renderContainer, {
-            backgroundColor: null,
-            scale: 1,
-            allowTaint: true,
-            useCORS: true,
-            logging: false,
-            width: this.width,
-            height: this.height
-          });
-          
-          return canvas.toDataURL('image/png');
-        } catch (error) {
-          console.error('html2canvas failed:', error);
-        }
+        console.log('Using html2canvas fallback');
+        const canvas = await html2canvas(this.renderContainer, {
+          backgroundColor: null,
+          scale: 1,
+          allowTaint: true,
+          useCORS: true,
+          logging: false
+        });
+        return canvas.toDataURL('image/png');
       }
-      
-      // Skip the createImageBitmap approach since it doesn't work with DOM elements
-      // and go straight to manual canvas capture
-      console.log('Using manual canvas capture approach');
-      return this.captureCanvasScreenshot();
     } catch (error) {
-      console.error('All screenshot methods failed:', error);
-      // Return blank image as last resort
-      return this.createBlankCanvas();
+      console.error('Screenshot failed:', error);
     }
+    
+    // Last resort: manual canvas capture
+    return this.captureCanvasScreenshot();
   }
-  
+
   /**
    * Create screenshot by drawing elements to canvas manually
    */

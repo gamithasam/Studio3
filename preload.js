@@ -17,5 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onProjectOpened: (callback) => ipcRenderer.on('project-opened', (_, value) => callback(value)),
   onSaveProject: (callback) => ipcRenderer.on('save-project', (_, value) => callback(value)),
   onMediaImported: (callback) => ipcRenderer.on('media-imported', (_, value) => callback(value)),
-  onExportToPNG: (callback) => ipcRenderer.on('export-to-png', (_, value) => callback(value))
+  onExportToPNG: (callback) => ipcRenderer.on('export-to-png', (_, value) => callback(value)),
+  onPrepareForCapture: (callback) => ipcRenderer.on('prepare-for-capture', (_, value) => callback(value)),
+  onCaptureComplete: (callback) => ipcRenderer.on('capture-complete', callback)
 });
