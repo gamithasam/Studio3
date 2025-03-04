@@ -135,11 +135,20 @@ class ExportRenderer {
         const executeFunction = new Function('THREE', 'gsap', 'scene', 'playSlides', code);
         executeFunction(THREE, gsap, new THREE.Scene(), playSlides);
         
+        console.log(`ExportRenderer: Loaded ${this.slideData.length} slides from code`);
         return this.slideData.length;
       } catch (err) {
         console.error('Error loading slides for export:', err);
         return 0;
       }
+    }
+    
+    /**
+     * Get the loaded slide data
+     * @returns {Array} The array of slides
+     */
+    getSlideData() {
+      return this.slideData;
     }
     
     /**
@@ -603,4 +612,3 @@ class ExportRenderer {
   }
   
   export default ExportRenderer;
-  
