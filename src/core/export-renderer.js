@@ -89,23 +89,6 @@ class ExportRenderer {
       this.camera = new THREE.PerspectiveCamera(75, this.width / this.height, 0.1, 100);
       this.camera.position.z = 3;
       
-      // Add a small indicator label during export (will be removed in final screenshots)
-      this.debugIndicator = document.createElement('div');
-      this.debugIndicator.id = 'debug-indicator';
-      this.debugIndicator.style.cssText = `
-        position: absolute;
-        bottom: 10px;
-        right: 10px;
-        background-color: rgba(255, 0, 0, 0.5);
-        color: white;
-        padding: 5px;
-        border-radius: 3px;
-        font-size: 12px;
-        z-index: 100000;
-      `;
-      this.debugIndicator.textContent = `EXPORT ${this.width}×${this.height}`;
-      this.renderContainer.appendChild(this.debugIndicator);
-      
       // If in render window, set up IPC listeners
       if (this.isInRenderWindow) {
         this.setupRenderWindowListeners();
@@ -218,10 +201,10 @@ class ExportRenderer {
           this.scene.remove(this.scene.children[0]); 
         }
         
-        // Clear the container except for the canvas and debug indicator
+        // Clear the container except for the canvas
         const children = Array.from(this.renderContainer.children);
         children.forEach(child => {
-          if (child !== this.renderer.domElement && child !== this.debugIndicator) {
+          if (child !== this.renderer.domElement) {
             child.remove();
           }
         });
@@ -279,11 +262,6 @@ class ExportRenderer {
         console.log('Waiting for stable render...');
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        // Hide the debug indicator for the screenshot
-        if (this.debugIndicator) {
-          this.debugIndicator.style.display = 'none';
-        }
-        
         // Take the screenshot - either in main window or render window
         console.log('Taking screenshot...');
         let screenshot = null;
@@ -334,11 +312,6 @@ class ExportRenderer {
           } catch (e) {
             console.error('Error checking screenshot dimensions:', e);
           }
-        }
-        
-        // Show the debug indicator again for next slides
-        if (this.debugIndicator) {
-          this.debugIndicator.style.display = 'block';
         }
         
         return screenshot;
