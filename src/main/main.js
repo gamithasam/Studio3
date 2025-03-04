@@ -28,9 +28,6 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../../index.html'));
   createMenu();
-
-  // Set up IPC handlers for render window
-  renderWindowManager.setupIpcHandlers();
 }
 
 function createMenu() {
@@ -210,7 +207,14 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-app.whenReady().then(createWindow);
+// Initialize IPC handlers once during app startup
+app.whenReady().then(() => {
+  // Set up IPC handlers for render window before creating any windows
+  renderWindowManager.setupIpcHandlers();
+  
+  // Create the main window
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

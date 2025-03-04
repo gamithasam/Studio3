@@ -16,6 +16,9 @@ function generateId() {
 // Map of render windows by ID
 const renderWindows = new Map();
 
+// Track if handlers are already set up
+let handlersInitialized = false;
+
 /**
  * Create a new invisible render window
  * @param {Object} options - Window options
@@ -226,6 +229,14 @@ function captureRenderWindowScreenshot(id, options) {
  * Setup IPC handlers for render window management
  */
 function setupIpcHandlers() {
+  // Skip if handlers are already initialized
+  if (handlersInitialized) {
+    console.log('Render window IPC handlers already initialized, skipping.');
+    return;
+  }
+  
+  console.log('Setting up render window IPC handlers');
+  
   // Handler for capturing screenshots
   ipcMain.handle('capture-render-window-screenshot', async (event, options) => {
     // Find the window ID based on webContents ID
@@ -244,6 +255,9 @@ function setupIpcHandlers() {
     
     return await captureRenderWindowScreenshot(windowId, options);
   });
+  
+  // Mark as initialized
+  handlersInitialized = true;
 }
 
 module.exports = {
