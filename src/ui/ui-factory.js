@@ -142,7 +142,17 @@ export default class UIFactory {
           <input type="radio" name="resolution" value="1280x720">
           <span style="color: #fff; margin-left: 0.5rem;">1280×720 (HD)</span>
         </label>
+        <label style="display: flex; align-items: center;">
+          <input type="radio" name="resolution" value="custom">
+          <span style="color: #fff; margin-left: 0.5rem;">Custom:</span>
+          <input type="number" id="customWidth" placeholder="Width" min="320" max="7680" style="width: 70px; margin: 0 5px; background: #333; color: white; border: 1px solid #555; padding: 3px;">
+          <span style="color: #fff;">×</span>
+          <input type="number" id="customHeight" placeholder="Height" min="240" max="4320" style="width: 70px; margin-left: 5px; background: #333; color: white; border: 1px solid #555; padding: 3px;">
+        </label>
       </div>
+      <p style="color: #aaa; font-size: 0.8rem; margin-top: 10px;">
+        Note: Ensure your system has sufficient resources for the selected resolution.
+      </p>
       <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem; gap: 1rem;">
         <button id="cancelExportBtn" style="padding: 0.5rem 1rem; background: #555; border: none; color: #fff; border-radius: 4px; cursor: pointer;">Cancel</button>
         <button id="startExportBtn" style="padding: 0.5rem 1rem; background: #007bff; border: none; color: #fff; border-radius: 4px; cursor: pointer;">Export</button>
@@ -159,6 +169,28 @@ export default class UIFactory {
       return new Promise((resolve) => {
         overlay.style.display = 'flex';
         
+        // Get form elements
+        const customWidthInput = document.getElementById('customWidth');
+        const customHeightInput = document.getElementById('customHeight');
+        const radios = document.querySelectorAll('input[name="resolution"]');
+        
+        // Enable/disable custom inputs based on selection
+        radios.forEach(radio => {
+          radio.addEventListener('change', () => {
+            const isCustom = radio.value === 'custom';
+            customWidthInput.disabled = !isCustom;
+            customHeightInput.disabled = !isCustom;
+            
+            if (isCustom) {
+              customWidthInput.focus();
+            }
+          });
+        });
+        
+        // Set initial state
+        customWidthInput.disabled = true;
+        customHeightInput.disabled = true;
+        
         // Get buttons
         const cancelBtn = document.getElementById('cancelExportBtn');
         const startBtn = document.getElementById('startExportBtn');
@@ -173,8 +205,19 @@ export default class UIFactory {
         
         // Handle start
         const onStart = () => {
+          let width, height;
           const selectedResolution = document.querySelector('input[name="resolution"]:checked').value;
-          const [width, height] = selectedResolution.split('x').map(Number);
+          
+          if (selectedResolution === 'custom') {
+            width = parseInt(customWidthInput.value) || 1920;
+            height = parseInt(customHeightInput.value) || 1080;
+            
+            // Enforce bounds
+            width = Math.min(Math.max(width, 320), 7680);
+            height = Math.min(Math.max(height, 240), 4320);
+          } else {
+            [width, height] = selectedResolution.split('x').map(Number);
+          }
           
           cancelBtn.removeEventListener('click', onCancel);
           startBtn.removeEventListener('click', onStart);

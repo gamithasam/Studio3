@@ -30,6 +30,12 @@ export default class ExportController {
       // If user canceled, exit early
       if (!exportConfig) return;
       
+      // Ensure exact pixel dimensions (no fractional pixels)
+      const width = Math.round(exportConfig.width);
+      const height = Math.round(exportConfig.height);
+      
+      console.log(`User selected export resolution: ${width}x${height}`);
+      
       // Update state
       this.appState.setState({ isExporting: true });
       
@@ -38,14 +44,14 @@ export default class ExportController {
       this.exportProgress.updateProgress(0, 'Initializing export...');
       
       // Initialize the export in a separate window
-      this.exportProgress.updateProgress(5, `Creating render window at ${exportConfig.width}×${exportConfig.height}...`);
+      this.exportProgress.updateProgress(5, `Creating render window at ${width}×${height}...`);
       
       try {
-        console.log('Creating render window...');
+        console.log(`Creating render window with exact dimensions: ${width}x${height}...`);
         // Create the invisible render window through Electron API
         renderWindowId = await window.electronAPI.createRenderWindow({
-          width: exportConfig.width,
-          height: exportConfig.height
+          width,
+          height
         });
         console.log(`Render window created with ID: ${renderWindowId}`);
       } catch (error) {
@@ -107,7 +113,7 @@ export default class ExportController {
       console.log(`Successfully rendered ${successfullyRenderedCount} out of ${slides.length} slides`);
       
       // Save all slides to the output directory
-      this.exportProgress.updateProgress(95, `Saving ${successfullyRenderedCount} rendered slides...`);
+      this.exportProgress.updateProgress(95, `Saving ${successfullyRenderedCount} rendered slides at ${width}x${height}...`);
       
       const savedCount = await this.saveExportedSlides(slides, exportConfig.outputDir);
       console.log(`Successfully saved ${savedCount} out of ${successfullyRenderedCount} rendered slides`);

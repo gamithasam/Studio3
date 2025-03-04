@@ -22,10 +22,11 @@ class ExportRenderer {
      * Initialize the renderer with the given dimensions
      */
     initialize(width, height) {
-      this.width = width || this.width;
-      this.height = height || this.height;
+      // Ensure we have exact pixel dimensions
+      this.width = Math.round(width) || this.width;
+      this.height = Math.round(height) || this.height;
       
-      console.log(`Initializing export renderer at ${this.width}x${this.height}`);
+      console.log(`Initializing export renderer at exact ${this.width}x${this.height} pixels`);
       
       // Create a dedicated renderer - in render window, we're making it visible by default
       this.renderingSpace = document.createElement('div');
@@ -43,7 +44,7 @@ class ExportRenderer {
       `;
       document.body.appendChild(this.renderingSpace);
       
-      // Create an aspect-ratio-preserving container
+      // Create an container with exact pixel dimensions
       this.renderContainer = document.createElement('div');
       this.renderContainer.id = 'export-render-container';
       this.renderContainer.style.cssText = `
@@ -58,27 +59,29 @@ class ExportRenderer {
       `;
       this.renderingSpace.appendChild(this.renderContainer);
       
-      // Create a canvas for Three.js content
+      // Create a canvas with exact pixel dimensions
       const canvas = document.createElement('canvas');
       canvas.width = this.width;
       canvas.height = this.height;
+      
+      // Make sure style doesn't resize the canvas
       canvas.style.cssText = `
         position: absolute;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
+        width: ${this.width}px;
+        height: ${this.height}px;
       `;
       this.renderContainer.appendChild(canvas);
       
-      // Set up Three.js renderer
+      // Set up Three.js renderer with exact pixel dimensions
       this.renderer = new THREE.WebGLRenderer({
         canvas,
         antialias: true,
         alpha: true,
         preserveDrawingBuffer: true
       });
-      this.renderer.setSize(this.width, this.height);
+      this.renderer.setSize(this.width, this.height, false); // false = don't use style
       this.renderer.setClearColor(0x000000, 0.9);
       
       // Create scene and camera
@@ -287,7 +290,7 @@ class ExportRenderer {
         
         try {
           if (this.isInRenderWindow && window.renderWindowAPI) {
-            console.log('Using render window native screenshot');
+            console.log(`Using render window native screenshot at ${this.width}x${this.height}`);
             screenshot = await window.renderWindowAPI.captureScreenshot({
               width: this.width,
               height: this.height
@@ -308,6 +311,29 @@ class ExportRenderer {
         } catch (err) {
           console.error('Screenshot capture failed:', err);
           screenshot = await this.captureScreenshot();
+        }
+        
+        // Verify image dimensions if we have access to the data
+        if (screenshot && screenshot.startsWith('data:image')) {
+          try {
+            // Create a temporary image to check dimensions
+            const img = new Image();
+            const imgPromise = new Promise((resolve, reject) => {
+              img.onload = () => {
+                console.log(`Screenshot dimensions: ${img.width}x${img.height} (expected: ${this.width}x${this.height})`);
+                if (img.width !== this.width || img.height !== this.height) {
+                  console.warn('Screenshot dimensions don\'t match expected dimensions!');
+                }
+                resolve();
+              };
+              img.onerror = reject;
+            });
+            
+            img.src = screenshot;
+            await imgPromise;
+          } catch (e) {
+            console.error('Error checking screenshot dimensions:', e);
+          }
         }
         
         // Show the debug indicator again for next slides

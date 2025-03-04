@@ -37,9 +37,11 @@ function createRenderWindow(options = {}) {
       console.log(`Creating render window (${id}) with dimensions ${width}x${height}`);
       
       // Create offscreen window with exact dimensions
+      // We need to ensure the content area size is exactly what we need
       const win = new BrowserWindow({
         width: width,
         height: height,
+        useContentSize: true, // Important: This ensures dimensions are for content area
         show: false, // Keep window hidden
         webPreferences: {
           preload: path.join(__dirname, '../preload/render-window-preload.js'),
@@ -62,7 +64,9 @@ function createRenderWindow(options = {}) {
       // Store window with its resolvers for IPC callbacks
       renderWindows.set(id, {
         window: win,
-        pendingCallbacks: new Map()
+        pendingCallbacks: new Map(),
+        width,   // Store exact width
+        height   // Store exact height
       });
       
       // Fix: Use the correct path to index.html (root of the project)
@@ -93,6 +97,16 @@ function createRenderWindow(options = {}) {
       win.webContents.once('did-finish-load', () => {
         clearTimeout(loadTimeout);
         console.log(`Render window ${id} created at ${width}x${height}`);
+        
+        // Verify window content size matches requested dimensions
+        const contentSize = win.getContentSize();
+        console.log(`Render window ${id} content size: ${contentSize[0]}x${contentSize[1]} (requested: ${width}x${height})`);
+        
+        // Adjust size if needed to ensure exact dimensions
+        if (contentSize[0] !== width || contentSize[1] !== height) {
+          win.setContentSize(width, height);
+          console.log(`Adjusted render window content size to ${width}x${height}`);
+        }
         
         // Short delay before resolving to ensure window is fully initialized
         setTimeout(() => resolve(id), 500);
@@ -215,10 +229,31 @@ function captureRenderWindowScreenshot(id, options) {
       return reject(new Error(`Render window ${id} not found`));
     }
     
-    const { window } = renderWindows.get(id);
+    const { window, width, height } = renderWindows.get(id);
     
-    window.webContents.capturePage().then(image => {
-      resolve(image.toDataURL());
+    // Use exact dimensions for capture
+    window.webContents.capturePage({
+      x: 0,
+      y: 0,
+      width: width,
+      height: height
+    }).then(image => {
+      // Check if the image dimensions match expected dimensions
+      const size = image.getSize();
+      console.log(`Captured image size: ${size.width}x${size.height} (expected: ${width}x${height})`);
+      
+      if (size.width !== width || size.height !== height) {
+        console.warn(`Image dimensions don't match requested dimensions, resizing...`);
+        // Resize image to match requested dimensions
+        const resizedImage = image.resize({
+          width,
+          height,
+          quality: 'best'
+        });
+        resolve(resizedImage.toDataURL());
+      } else {
+        resolve(image.toDataURL());
+      }
     }).catch(err => {
       reject(err);
     });
