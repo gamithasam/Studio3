@@ -1,6 +1,6 @@
 /**
  * Export Renderer for Animotion
- * Uses Electron's native screenshot capability for exact exports
+ * Modified to support rendering in a separate invisible window
  */
 
 class ExportRenderer {
@@ -15,6 +15,7 @@ class ExportRenderer {
       this.scene = null;
       this.camera = null;
       this.electronCapture = 'electron' in window;
+      this.isInRenderWindow = window.location.hash.includes('renderWindow');
     }
   
     /**
@@ -26,7 +27,7 @@ class ExportRenderer {
       
       console.log(`Initializing export renderer at ${this.width}x${this.height}`);
       
-      // Create a dedicated full-page renderer - MUST be in the viewport to render correctly
+      // Create a dedicated renderer - in render window, we're making it visible by default
       this.renderingSpace = document.createElement('div');
       this.renderingSpace.id = 'export-render-space';
       this.renderingSpace.style.cssText = `
@@ -37,7 +38,7 @@ class ExportRenderer {
         height: 100vh;
         background: #000000;
         z-index: 99999;
-        display: none;
+        display: ${this.isInRenderWindow ? 'block' : 'none'};
         overflow: hidden;
       `;
       document.body.appendChild(this.renderingSpace);
@@ -102,7 +103,54 @@ class ExportRenderer {
       this.debugIndicator.textContent = `EXPORT ${this.width}×${this.height}`;
       this.renderContainer.appendChild(this.debugIndicator);
       
+      // If in render window, set up IPC listeners
+      if (this.isInRenderWindow) {
+        this.setupRenderWindowListeners();
+      }
+      
       return this;
+    }
+
+    /**
+     * Set up listeners for render window IPC commands
+     */
+    setupRenderWindowListeners() {
+      if (!window.renderWindowAPI) return;
+      
+      // Listen for media data transfer
+      window.renderWindowAPI.onTransferMedia((mediaData) => {
+        console.log('Render window received media data:', mediaData.length);
+        this.mediaData = mediaData;
+      });
+      
+      // Listen for slide load command
+      window.renderWindowAPI.onLoadSlides(async (code) => {
+        try {
+          const slideCount = this.loadSlideData(code, this.mediaData);
+          return { success: true, slideCount };
+        } catch (err) {
+          console.error('Error loading slides in render window:', err);
+          return { success: false, error: err.message };
+        }
+      });
+      
+      // Listen for render slide command
+      window.renderWindowAPI.onRenderSlide(async (index) => {
+        try {
+          const screenshot = await this.renderSlide(index);
+          return { 
+            success: true, 
+            screenshot 
+          };
+        } catch (err) {
+          console.error(`Error rendering slide ${index} in render window:`, err);
+          return { 
+            success: false, 
+            error: err.message,
+            screenshot: this.createBlankCanvas() 
+          };
+        }
+      });
     }
     
     /**
@@ -233,21 +281,29 @@ class ExportRenderer {
           this.debugIndicator.style.display = 'none';
         }
         
-        // Take the screenshot without any DOM modifications
+        // Take the screenshot - either in main window or render window
         console.log('Taking screenshot...');
         let screenshot = null;
         
         try {
-          console.log('Using Electron native screenshot');
-          const rect = this.renderContainer.getBoundingClientRect();
-          console.log(`Capture rect: x=${rect.left}, y=${rect.top}, w=${rect.width}, h=${rect.height}`);
-          
-          screenshot = await window.electronAPI.captureElement({
-            x: Math.round(rect.left),
-            y: Math.round(rect.top),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height)
-          });
+          if (this.isInRenderWindow && window.renderWindowAPI) {
+            console.log('Using render window native screenshot');
+            screenshot = await window.renderWindowAPI.captureScreenshot({
+              width: this.width,
+              height: this.height
+            });
+          } else {
+            console.log('Using Electron native screenshot');
+            const rect = this.renderContainer.getBoundingClientRect();
+            console.log(`Capture rect: x=${rect.left}, y=${rect.top}, w=${rect.width}, h=${rect.height}`);
+            
+            screenshot = await window.electronAPI.captureElement({
+              x: Math.round(rect.left),
+              y: Math.round(rect.top),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height)
+            });
+          }
           console.log('Screenshot captured successfully');
         } catch (err) {
           console.error('Screenshot capture failed:', err);
@@ -264,8 +320,10 @@ class ExportRenderer {
         console.error(`Error rendering slide ${index}:`, error);
         throw error;
       } finally {
-        // Hide the rendering space
-        this.renderingSpace.style.display = 'none';
+        // If not in render window, hide the rendering space
+        if (!this.isInRenderWindow) {
+          this.renderingSpace.style.display = 'none';
+        }
         
         // Clean up GSAP animations
         gsap.globalTimeline.clear();

@@ -12,6 +12,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Screenshot capture
   captureElement: (rect) => ipcRenderer.invoke('capture-element', rect),
   
+  // Render window APIs
+  createRenderWindow: (options) => ipcRenderer.invoke('create-render-window', options),
+  closeRenderWindow: (id) => ipcRenderer.invoke('close-render-window', id),
+  transferMediaToRenderWindow: (id, mediaData) => ipcRenderer.invoke('transfer-media-to-render-window', id, mediaData),
+  loadSlidesInRenderWindow: (id, code) => ipcRenderer.invoke('load-slides-in-render-window', id, code),
+  renderSlideInWindow: (id, slideIndex) => ipcRenderer.invoke('render-slide-in-window', id, slideIndex),
+  
   // Event listeners
   onNewProject: (callback) => ipcRenderer.on('new-project', callback),
   onProjectOpened: (callback) => ipcRenderer.on('project-opened', (_, value) => callback(value)),

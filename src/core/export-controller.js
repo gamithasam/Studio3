@@ -21,6 +21,8 @@ export default class ExportController {
    * @param {Object} options.mediaData - Media data
    */
   async exportToPNG({ outputDir, editorContent, mediaData }) {
+    let renderWindowId = null;
+    
     try {
       // First, show the resolution selector
       const exportConfig = await this.resolutionSelector.show(outputDir);
@@ -35,36 +37,70 @@ export default class ExportController {
       this.exportProgress.show();
       this.exportProgress.updateProgress(0, 'Initializing export...');
       
-      // Initialize the export renderer with selected dimensions
-      const exporter = new ExportRenderer();
-      exporter.initialize(exportConfig.width, exportConfig.height);
+      // Initialize the export in a separate window
+      this.exportProgress.updateProgress(5, `Creating render window at ${exportConfig.width}×${exportConfig.height}...`);
       
-      // Log export resolution
-      console.log(`Exporting slides at ${exportConfig.width}×${exportConfig.height}`);
-      this.exportProgress.updateProgress(5, `Preparing ${exportConfig.width}×${exportConfig.height} export...`);
+      try {
+        console.log('Creating render window...');
+        // Create the invisible render window through Electron API
+        renderWindowId = await window.electronAPI.createRenderWindow({
+          width: exportConfig.width,
+          height: exportConfig.height
+        });
+        console.log(`Render window created with ID: ${renderWindowId}`);
+      } catch (error) {
+        console.error('Detailed render window creation error:', error);
+        throw new Error(`Failed to create render window: ${error.message}`);
+      }
       
-      // Load slides data
-      const totalSlideCount = exporter.loadSlideData(editorContent, mediaData);
+      if (!renderWindowId) {
+        throw new Error('Failed to create render window - returned empty ID');
+      }
       
-      // Double-check the actual slide count from the renderer's internal data
-      const actualSlideData = exporter.getSlideData ? exporter.getSlideData() : [];
-      const actualSlideCount = actualSlideData.length || totalSlideCount;
+      console.log(`Successfully created render window with ID: ${renderWindowId}`);
       
-      console.log(`Total slides to export: ${actualSlideCount} (reported: ${totalSlideCount})`);
+      // Transfer media data to render window
+      this.exportProgress.updateProgress(10, 'Transferring media assets...');
+      console.log(`Transferring ${mediaData.length} media items to render window...`);
+      await window.electronAPI.transferMediaToRenderWindow(renderWindowId, mediaData);
+      console.log('Media transfer complete');
       
-      if (actualSlideCount === 0) {
+      // Load slides code in render window
+      this.exportProgress.updateProgress(15, 'Loading slides in render window...');
+      const slidesResult = await window.electronAPI.loadSlidesInRenderWindow(renderWindowId, editorContent);
+      
+      if (!slidesResult.success) {
+        throw new Error(`Error loading slides: ${slidesResult.error}`);
+      }
+      
+      const slideCount = slidesResult.slideCount;
+      console.log(`Total slides to export: ${slideCount}`);
+      
+      if (slideCount === 0) {
         throw new Error('No slides found in the presentation.');
       }
       
-      this.exportProgress.updateProgress(10, `Found ${actualSlideCount} slides to export.`);
+      this.exportProgress.updateProgress(20, `Found ${slideCount} slides to export.`);
       
       // Export all slides with progress updates
-      const slides = await exporter.exportAllSlides(progress => {
-        const percent = 10 + ((progress.current / progress.total) * 85);
-        this.exportProgress.updateProgress(percent, progress.message);
-      });
-      
-      console.log(`Rendered slides array length: ${slides.length}`);
+      const slides = [];
+      for (let i = 0; i < slideCount; i++) {
+        const progressPercent = 20 + ((i / slideCount) * 75);
+        const message = `Rendering slide ${i + 1} of ${slideCount}...`;
+        this.exportProgress.updateProgress(progressPercent, message);
+        
+        // Render slide in the invisible window and capture screenshot
+        const result = await window.electronAPI.renderSlideInWindow(renderWindowId, i);
+        
+        slides.push({
+          index: i,
+          data: result.screenshot,
+          success: result.success,
+          error: result.error
+        });
+        
+        console.log(`Slide ${i + 1} rendered: ${result.success ? 'Success' : 'Failed'}`);
+      }
       
       // Count successfully rendered slides
       const successfullyRenderedCount = slides.filter(slide => slide.success).length;
@@ -73,25 +109,19 @@ export default class ExportController {
       // Save all slides to the output directory
       this.exportProgress.updateProgress(95, `Saving ${successfullyRenderedCount} rendered slides...`);
       
-      // Create a map of slide indices for consistent numbering
-      const slideIndexMap = new Map();
-      slides.forEach((slide, i) => {
-        slideIndexMap.set(slide.index, i);
-      });
-      
-      const savedCount = await this.saveExportedSlides(slides, exportConfig.outputDir, slideIndexMap);
+      const savedCount = await this.saveExportedSlides(slides, exportConfig.outputDir);
       console.log(`Successfully saved ${savedCount} out of ${successfullyRenderedCount} rendered slides`);
       
-      // Clean up export renderer resources
-      exporter.destroy();
+      // Close the render window
+      await window.electronAPI.closeRenderWindow(renderWindowId);
       
-      // Use the actual total slide count from the beginning for accuracy
-      if (savedCount === actualSlideCount) {
+      // Show completion message
+      if (savedCount === slideCount) {
         this.exportProgress.updateProgress(100, `Successfully exported all ${savedCount} slides!`);
       } else if (savedCount === 0) {
         this.exportProgress.updateProgress(100, `Failed to export any slides.`);
       } else {
-        this.exportProgress.updateProgress(100, `Exported ${savedCount} of ${actualSlideCount} slides.`);
+        this.exportProgress.updateProgress(100, `Exported ${savedCount} of ${slideCount} slides.`);
       }
       
       setTimeout(() => {
@@ -102,6 +132,16 @@ export default class ExportController {
     } catch (error) {
       console.error('Export error:', error);
       this.exportProgress.updateProgress(100, `Error: ${error.message}`);
+      
+      // Clean up render window if it was created
+      if (renderWindowId) {
+        try {
+          await window.electronAPI.closeRenderWindow(renderWindowId);
+        } catch (cleanupErr) {
+          console.error('Failed to close render window during error cleanup:', cleanupErr);
+        }
+      }
+      
       setTimeout(() => {
         this.exportProgress.hide();
         this.appState.setState({ isExporting: false });
@@ -110,14 +150,13 @@ export default class ExportController {
   }
 
   /**
-   * Save exported slides to disk with accurate indexing
+   * Save exported slides to disk
    * @private
    * @param {Array} slides - Slides to save
    * @param {string} outputDir - Output directory
-   * @param {Map} slideIndexMap - Map of slide indices to array indices
    * @returns {Promise<number>} Number of successfully saved slides
    */
-  async saveExportedSlides(slides, outputDir, slideIndexMap) {
+  async saveExportedSlides(slides, outputDir) {
     let successCount = 0;
     const successfulSlides = slides.filter(slide => slide.success);
     
@@ -126,10 +165,8 @@ export default class ExportController {
     for (let i = 0; i < successfulSlides.length; i++) {
       const slide = successfulSlides[i];
       
-      // Use the original slide index + 1 for the filename to maintain order
-      const slideNumber = slideIndexMap ? slideIndexMap.get(slide.index) + 1 : slide.index + 1;
-      
-      // Ensure we have consistent slide numbering
+      // Use the slide index + 1 for the filename to maintain order
+      const slideNumber = slide.index + 1;
       const fileName = `slide_${String(slideNumber).padStart(2, '0')}.png`;
       const filePath = `${outputDir}/${fileName}`;
       

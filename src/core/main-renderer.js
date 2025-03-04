@@ -39,9 +39,42 @@ export default class MainRenderer {
     // Make external libraries available
     window.Water = Water;
     window.Sky = Sky;
+    
+    // Special handling for render window
+    this.isRenderWindow = window.location.hash.includes('renderWindow');
+    if (this.isRenderWindow) {
+      this.initializeAsRenderWindow();
+      return;
+    }
+  }
+  
+  /**
+   * Initialize this window as a render window
+   */
+  initializeAsRenderWindow() {
+    console.log('Initializing as render window');
+    document.body.innerHTML = '<div id="render-window-container"></div>';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    document.body.style.backgroundColor = '#000000';
+    
+    // Make external libraries available
+    window.Water = Water;
+    window.Sky = Sky;
+    
+    // Initialize export renderer with default size (will be updated later)
+    const exporter = new ExportRenderer();
+    exporter.initialize(1920, 1080);
+    
+    // Store exporter for later use
+    window.animotionExporter = exporter;
   }
   
   async init() {
+    // Skip regular initialization if this is a render window
+    if (this.isRenderWindow) return;
+    
     // Initialize project manager
     this.projectManager = new ProjectManager();
     this.projectManager.exposeMediaToRenderer();

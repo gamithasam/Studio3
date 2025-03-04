@@ -3,6 +3,9 @@ const path = require('path');
 const fontList = require('font-list');
 const fs = require('fs');
 
+// Import the render window manager
+const renderWindowManager = require('./render-window');
+
 let mainWindow;
 let currentProjectPath = null;
 
@@ -25,6 +28,9 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../../index.html'));
   createMenu();
+
+  // Set up IPC handlers for render window
+  renderWindowManager.setupIpcHandlers();
 }
 
 function createMenu() {
@@ -366,4 +372,25 @@ ipcMain.handle('capture-element', async (event, rect) => {
       throw error;
     }
   }
+});
+
+// Add these IPC handlers
+ipcMain.handle('create-render-window', async (event, options) => {
+  return await renderWindowManager.createRenderWindow(options);
+});
+
+ipcMain.handle('close-render-window', async (event, id) => {
+  return await renderWindowManager.closeRenderWindow(id);
+});
+
+ipcMain.handle('transfer-media-to-render-window', async (event, id, mediaData) => {
+  return await renderWindowManager.transferMediaToRenderWindow(id, mediaData);
+});
+
+ipcMain.handle('load-slides-in-render-window', async (event, id, code) => {
+  return await renderWindowManager.loadSlidesInRenderWindow(id, code);
+});
+
+ipcMain.handle('render-slide-in-window', async (event, id, slideIndex) => {
+  return await renderWindowManager.renderSlideInWindow(id, slideIndex);
 });
