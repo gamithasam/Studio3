@@ -2,9 +2,9 @@
 
 import { Water } from 'three/addons/objects/Water.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import ProjectManager from './project-manager.js';
-import MediaAutocompleteProvider from './media-autocomplete.js';
-import ExportRenderer from './export-renderer.js';
+import ProjectManager from './src/core/project-manager.js';
+import MediaAutocompleteProvider from './src/core/media-autocomplete.js';
+import ExportRenderer from './src/core/export-renderer.js';
 
 window.Water = Water;
 window.Sky = Sky;
@@ -851,7 +851,7 @@ playSlides(slides);
       
       // Open the presentation window without data in URL
       const presentationWindow = window.open(
-        `presentation.html`, 
+        `./src/presentation/presentation.html`, 
         'presentation',
         'fullscreen=yes,menubar=no,toolbar=no,location=no'
       );
