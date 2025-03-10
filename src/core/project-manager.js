@@ -1,6 +1,6 @@
 /**
  * Project Manager
- * Handles saving, loading, and managing project files (.hime)
+ * Handles saving, loading, and managing project files (.s3p)
  */
 
 class ProjectManager {
@@ -97,7 +97,7 @@ class ProjectManager {
         this.projectPath = filePath;
         // Fix: extract filename without using path module
         const pathParts = filePath.split('/');
-        this.projectName = project.name || pathParts[pathParts.length - 1].replace('.hime', '');
+        this.projectName = project.name || pathParts[pathParts.length - 1].replace('.s3p', '');
         
         // Load media assets
         this.mediaAssets = project.media || [];
@@ -152,7 +152,7 @@ class ProjectManager {
         
         // Extract file name from path for the project name
         const pathParts = filePath.split('/');
-        const fileName = pathParts[pathParts.length - 1].replace('.hime', '');
+        const fileName = pathParts[pathParts.length - 1].replace('.s3p', '');
         
         // Update project path and name
         this.projectPath = filePath;
@@ -160,7 +160,7 @@ class ProjectManager {
         
         // Create the project data structure
         const projectData = {
-          format: "hime-1.0",
+          format: "s3p-1.0",
           name: this.projectName,
           created: new Date().toISOString(),
           lastModified: new Date().toISOString(),

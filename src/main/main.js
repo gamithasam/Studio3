@@ -65,7 +65,7 @@ function createMenu() {
           accelerator: 'CmdOrCtrl+O',
           click: async () => {
             const { canceled, filePaths } = await dialog.showOpenDialog({
-              filters: [{ name: 'Studio3 Presentations', extensions: ['hime'] }],
+              filters: [{ name: 'Studio3 Presentations', extensions: ['s3p'] }],
               properties: ['openFile']
             });
             
@@ -85,7 +85,7 @@ function createMenu() {
             } else {
               // No current project path, use Save As instead
               const { canceled, filePath } = await dialog.showSaveDialog({
-                filters: [{ name: 'Studio3 Presentations', extensions: ['hime'] }]
+                filters: [{ name: 'Studio3 Presentations', extensions: ['s3p'] }]
               });
               
               if (!canceled && filePath) {
@@ -100,7 +100,7 @@ function createMenu() {
           accelerator: 'Shift+CmdOrCtrl+S',
           click: async () => {
             const { canceled, filePath } = await dialog.showSaveDialog({
-              filters: [{ name: 'Studio3 Presentations', extensions: ['hime'] }]
+              filters: [{ name: 'Studio3 Presentations', extensions: ['s3p'] }]
             });
             
             if (!canceled && filePath) {
