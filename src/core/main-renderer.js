@@ -114,7 +114,7 @@ export default class MainRenderer {
   
   async initMonacoEditor() {
     return new Promise((resolve) => {
-      require.config({ paths: { 'vs': './vs' } });
+      require.config({ paths: { 'vs': './node_modules/monaco-editor/min/vs' } });
       
       require(['vs/editor/editor.main'], async (monaco) => {
         // Initialize editor manager
