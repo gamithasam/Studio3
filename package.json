@@ -8,6 +8,8 @@
     "start": "electron ."
   },
   "dependencies": {
+    "@theatre/core": "^0.7.2",
+    "@theatre/studio": "^0.7.2",
     "electron": "^26.0.0",
     "font-list": "^1.5.1",
     "gsap": "^3.12.2",

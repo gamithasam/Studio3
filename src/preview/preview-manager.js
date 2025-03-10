@@ -1,6 +1,8 @@
 /**
  * Preview Manager - Handles 3D scene setup and rendering
  */
+import studio from '@theatre/studio'
+import { getProject } from '@theatre/core'
 
 export default class PreviewManager {
   constructor() {
@@ -11,6 +13,12 @@ export default class PreviewManager {
     this.renderer = null;
     this.animationFrame = null;
     this.isPlaying = false;
+    
+    // Theatre.js properties
+    this.theatreProject = null;
+    this.theatreSheet = null;
+    this.theatreObjects = new Map(); // Track objects added to Theatre.js
+    this.sceneObserver = null; // Observer for scene children changes
   }
   
   init() {
@@ -25,6 +33,22 @@ export default class PreviewManager {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(75, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 100);
     this.camera.position.z = 3;
+    
+    // Create container for Theatre.js UI
+    this.createTheatreContainer();
+    
+    // Initialize Theatre.js with custom container
+    studio.initialize({
+      container: document.getElementById('theatre-container')
+    });
+    this.theatreProject = getProject('Studio3 Project');
+    this.theatreSheet = this.theatreProject.sheet('Scene');
+    
+    // Register camera with Theatre.js
+    this.registerObjectWithTheatre(this.camera, 'camera');
+    
+    // Setup observer to detect user-added objects
+    this.setupSceneObserver();
     
     this.startAnimation();
     window.addEventListener('resize', this.handleResize.bind(this));
@@ -57,6 +81,54 @@ export default class PreviewManager {
   startAnimation() {
     // Optimized animation function that conditionally renders
     const animate = () => {
+      // Update Three.js objects from Theatre.js values
+      this.theatreObjects.forEach(({ threeObject, theatreObject }) => {
+        if (!threeObject || !theatreObject) return;
+        
+        try {
+          const values = theatreObject.value;
+          
+          if (values.position && threeObject.position) {
+            threeObject.position.set(
+              values.position.x,
+              values.position.y,
+              values.position.z
+            );
+          }
+          
+          if (values.rotation && threeObject.rotation) {
+            threeObject.rotation.set(
+              values.rotation.x,
+              values.rotation.y,
+              values.rotation.z
+            );
+          }
+          
+          if (values.scale && threeObject.scale) {
+            threeObject.scale.set(
+              values.scale.x,
+              values.scale.y,
+              values.scale.z
+            );
+          }
+          
+          // Handle other properties
+          if (values.intensity !== undefined && threeObject.intensity !== undefined) {
+            threeObject.intensity = values.intensity;
+          }
+          
+          if (values.color && threeObject.color) {
+            threeObject.color.setRGB(
+              values.color.r,
+              values.color.g,
+              values.color.b
+            );
+          }
+        } catch (error) {
+          console.warn(`Error updating object with Theatre.js: ${error.message}`);
+        }
+      });
+      
       // Only update renderer if not in play mode
       if (!this.isPlaying) {
         this.resizeRenderer();
@@ -122,10 +194,178 @@ export default class PreviewManager {
     return this.scene;
   }
   
+  // Create a container for Theatre.js UI within the preview pane
+  createTheatreContainer() {
+    const container = document.createElement('div');
+    container.id = 'theatre-container';
+    container.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    `;
+    
+    // Add CSS to constrain Theatre.js UI
+    const style = document.createElement('style');
+    style.textContent = `
+      #theatre-container .theatre-widget-root {
+        position: absolute !important;
+        bottom: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: 40% !important;
+        pointer-events: auto !important;
+      }
+      
+      #theatre-container .theatre-toolbar {
+        position: absolute !important;
+        top: 10px !important;
+        right: 10px !important;
+        pointer-events: auto !important;
+      }
+      
+      #theatre-container .theatre-docking-layer {
+        pointer-events: auto !important;
+      }
+      
+      #theatre-container .theatre-panel {
+        max-height: calc(100% - 20px) !important;
+        max-width: calc(100% - 20px) !important;
+        pointer-events: auto !important;
+      }
+    `;
+    
+    document.head.appendChild(style);
+    this.preview.appendChild(container);
+  }
+  
+  // Setup observer to watch for scene changes
+  setupSceneObserver() {
+    // Use a periodic function to check for new objects
+    this.sceneCheckInterval = setInterval(() => {
+      this.scanSceneForNewObjects();
+    }, 1000); // Check every second
+    
+    // Also scan at the beginning
+    setTimeout(() => this.scanSceneForNewObjects(), 100);
+  }
+  
+  // Scan the scene for objects not yet registered with Theatre.js
+  scanSceneForNewObjects() {
+    const processObject = (obj, prefix = '') => {
+      const objectId = prefix + (obj.name || obj.uuid);
+      
+      // Skip if already registered
+      if (!this.theatreObjects.has(objectId) && obj !== this.camera) {
+        // Register visible objects that can be animated
+        if (obj.visible !== undefined && 
+            (obj.position || obj.rotation || obj.scale)) {
+          this.registerObjectWithTheatre(obj, objectId);
+        }
+      }
+      
+      // Process children recursively
+      if (obj.children) {
+        obj.children.forEach((child, index) => {
+          processObject(child, `${objectId}_child${index}_`);
+        });
+      }
+    };
+    
+    // Process all scene children
+    this.scene.children.forEach((obj, index) => {
+      if (obj !== this.camera) { // Skip camera as it's already registered
+        processObject(obj, `sceneObj${index}_`);
+      }
+    });
+  }
+  
+  // Register a Three.js object with Theatre.js for animation control
+  registerObjectWithTheatre(object, objectId) {
+    // Skip objects without proper properties
+    if (!object.position || !object.rotation) {
+      return null;
+    }
+    
+    console.log(`Registering object with Theatre.js: ${objectId}`);
+    
+    // Define props based on object type
+    const props = {
+      position: {
+        x: object.position.x,
+        y: object.position.y, 
+        z: object.position.z
+      },
+      rotation: {
+        x: object.rotation.x,
+        y: object.rotation.y,
+        z: object.rotation.z
+      }
+    };
+    
+    // Add scale if available
+    if (object.scale) {
+      props.scale = {
+        x: object.scale.x ?? 1,
+        y: object.scale.y ?? 1,
+        z: object.scale.z ?? 1
+      };
+    }
+    
+    // Add other properties based on object type
+    if (object.intensity !== undefined) {
+      props.intensity = object.intensity;
+    }
+    
+    if (object.color !== undefined && object.color.r !== undefined) {
+      props.color = {
+        r: object.color.r,
+        g: object.color.g,
+        b: object.color.b
+      };
+    }
+    
+    // Create Theatre.js object
+    const theatreObject = this.theatreSheet.object(objectId, props);
+
+    // Store reference to the object
+    this.theatreObjects.set(objectId, {
+      threeObject: object,
+      theatreObject: theatreObject
+    });
+
+    return theatreObject;
+  }
+
+  // Remove an object from Theatre.js control
+  unregisterObjectFromTheatre(objectId) {
+    if (this.theatreObjects.has(objectId)) {
+      this.theatreObjects.delete(objectId);
+    }
+  }
+
+  // Show Theatre.js UI
+  showTheatreUI() {
+    studio.ui.show();
+  }
+
+  // Hide Theatre.js UI
+  hideTheatreUI() {
+    studio.ui.hide();
+  }
+  
   // Clean up resources when no longer needed
   destroy() {
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
+    }
+    
+    // Clear intervals
+    if (this.sceneCheckInterval) {
+      clearInterval(this.sceneCheckInterval);
     }
     
     // Clear the scene
@@ -136,9 +376,19 @@ export default class PreviewManager {
       this.scene.remove(object); 
     }
     
+    // Clean up Theatre.js
+    this.theatreObjects.clear();
+    studio.ui.hide();
+    
     // Dispose of renderer
     if (this.renderer) {
       this.renderer.dispose();
+    }
+    
+    // Remove theatre container
+    const container = document.getElementById('theatre-container');
+    if (container) {
+      container.remove();
     }
   }
 }
