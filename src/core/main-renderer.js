@@ -68,7 +68,7 @@ export default class MainRenderer {
     exporter.initialize(1920, 1080);
     
     // Store exporter for later use
-    window.animotionExporter = exporter;
+    window.studio3Exporter = exporter;
   }
   
   async init() {

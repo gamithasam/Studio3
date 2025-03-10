@@ -1,5 +1,5 @@
 /**
- * Export Renderer for Animotion
+ * Export Renderer for Studio3
  * Modified to support rendering in a separate invisible window
  */
 

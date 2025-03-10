@@ -1,5 +1,5 @@
 /**
- * Main entry point for Animotion application
+ * Main entry point for Studio3 application
  * Initializes the main renderer with all components
  */
 

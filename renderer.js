@@ -1,4 +1,4 @@
-// Main entry point for the Animotion application
+// Main entry point for the Studio3 application
 
 import { Water } from 'three/addons/objects/Water.js';
 import { Sky } from 'three/addons/objects/Sky.js';

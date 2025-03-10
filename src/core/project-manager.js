@@ -84,7 +84,7 @@ class ProjectManager {
       this.unsavedChanges = false;
       
       // Update the title bar
-      document.querySelector('.title-bar-text').textContent = "Animotion - Untitled";
+      document.querySelector('.title-bar-text').textContent = "Studio3 - Untitled";
     }
   
     // Load a project from file
@@ -107,7 +107,7 @@ class ProjectManager {
         
         // Update the title bar with project name
         document.querySelector('.title-bar-text').textContent = 
-          `Animotion - ${this.projectName}`;
+          `Studio3 - ${this.projectName}`;
         
         // Update the media panel
         this.updateMediaPanel();
@@ -176,7 +176,7 @@ class ProjectManager {
           
           // Update the title bar
           document.querySelector('.title-bar-text').textContent = 
-            `Animotion - ${this.projectName}`;
+            `Studio3 - ${this.projectName}`;
           
           this.unsavedChanges = false;
         } else {

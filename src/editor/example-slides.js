@@ -10,7 +10,7 @@ const slides = [
     init({ scene, container }) {
       // Slide 1: Title with floating 3D cube
       const title = document.createElement('h1');
-      title.textContent = 'Welcome to Animotion';
+      title.textContent = 'Welcome to Studio3';
       title.style.cssText = 'color: white; opacity: 0; position: relative;';
       
       const subtitle = document.createElement('h2');
@@ -164,7 +164,7 @@ const slides = [
                 — Steve Jobs
             </h2>
             <p style="font-size: 1.2em; opacity: 0; transform: translateY(20px); margin-top: 50px; color: #666;">
-                Animotion combines beautiful design with powerful functionality,<br>
+                Studio3 combines beautiful design with powerful functionality,<br>
                 creating presentations that truly stand out.
             </p>
         \`;
