@@ -26,7 +26,8 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../../index.html'));
+  // mainWindow.loadFile(path.join(__dirname, '../../index.html'));
+  mainWindow.loadURL('http://localhost:5176');
   createMenu();
 }
 
