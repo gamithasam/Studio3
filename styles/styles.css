@@ -398,6 +398,7 @@ html, body {
     position: relative;
     min-width: 300px;
     height: 100%;
+    overflow: hidden; /* Add overflow control to contain elements */
 }
 
 #threeCanvas {
@@ -419,6 +420,7 @@ html, body {
     align-items: center;
     pointer-events: none;
     z-index: 1;
+    overflow: hidden; /* Ensure overlay content doesn't overflow */
 }
 
 /* Context menu for media items */
@@ -630,12 +632,20 @@ datalist option:hover {
     outline: 2px dashed #007bff;
 }
 
+[data-slide-container] {
+    position: relative;
+    overflow: hidden; /* Contain slide content */
+}
+
 [data-slide-container] h1, 
 [data-slide-container] h2, 
 [data-slide-container] p, 
 [data-slide-container] li {
     cursor: pointer;
     position: relative;
+    max-width: 100%; /* Prevent text elements from extending beyond container */
+    overflow-wrap: break-word; /* Ensure long words break properly */
+    word-wrap: break-word;
 }
 
 /* Media autocomplete dropdown */
