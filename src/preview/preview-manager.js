@@ -41,6 +41,10 @@ export default class PreviewManager {
     studio.initialize({
       container: document.getElementById('theatre-container')
     });
+    
+    // Set up mutation observer to contain Theatre.js UI
+    this.setupTheatreContainment();
+    
     this.theatreProject = getProject('Studio3 Project');
     this.theatreSheet = this.theatreProject.sheet('Scene');
     
@@ -206,35 +210,91 @@ export default class PreviewManager {
       height: 100%;
       pointer-events: none;
       z-index: 1000;
+      overflow: hidden;
+      contain: strict;
     `;
     
     // Add CSS to constrain Theatre.js UI
     const style = document.createElement('style');
     style.textContent = `
-      #theatre-container .theatre-widget-root {
+      /* Global rule to capture Theatre.js elements anywhere */
+      body > div[class*="theatre-"],
+      body > div[id*="theatre-"],
+      body > div[class*="Theatre"],
+      body > div[data-sheet],
+      body > div[data-sequence-editor],
+      body > div[data-dock],
+      body > .theatre-widget-root,
+      body > .theatre-popover-container,
+      body > .theatre-flyout-container {
+        display: none !important; /* Hide any Theatre elements outside our container */
+      }
+      
+      /* Base Theatre container */
+      #theatre-container {
+        overflow: hidden !important;
+        contain: strict !important;
+      }
+
+      /* Ensure all Theatre.js elements stay where they belong */
+      #theatre-container * {
+        transform: none !important;
+        position: relative !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+      }
+      
+      /* Reset position for key containers that need to be absolutely positioned */
+      #theatre-container .theatre-widget-root,
+      #theatre-container .theatre-toolbar,
+      #theatre-container .theatre-panel,
+      #theatre-container .theatre-popover-container,
+      #theatre-container .theatre-flyout-container {
         position: absolute !important;
+      }
+
+      /* Main widget root */
+      #theatre-container .theatre-widget-root {
         bottom: 0 !important;
+        left: 0 !important;
         right: 0 !important;
         width: 100% !important;
         max-height: 40% !important;
         pointer-events: auto !important;
+        overflow: auto !important;
       }
       
+      /* Toolbar */
       #theatre-container .theatre-toolbar {
-        position: absolute !important;
         top: 10px !important;
         right: 10px !important;
+        left: auto !important;
         pointer-events: auto !important;
+        max-width: calc(100% - 20px) !important;
       }
       
-      #theatre-container .theatre-docking-layer {
-        pointer-events: auto !important;
+      /* Other containers */
+      #theatre-container .theatre-popover-container,
+      #theatre-container .theatre-flyout-container,
+      #theatre-container div[data-position],
+      #theatre-container div[data-popper-reference-hidden] {
+        inset: auto !important;
+        max-width: calc(100% - 20px) !important;
+        max-height: calc(100% - 20px) !important;
+        overflow: auto !important;
+        top: auto !important;
+        left: auto !important;
+        right: 10px !important;
+        bottom: 10px !important;
+        margin: 0 !important;
+        transform: none !important;
       }
       
-      #theatre-container .theatre-panel {
+      #preview #theatre-container .theatre-panel,
+      #preview [class*="theatre-"] {
         max-height: calc(100% - 20px) !important;
         max-width: calc(100% - 20px) !important;
-        pointer-events: auto !important;
+        overflow: auto !important;
       }
     `;
     
@@ -357,6 +417,57 @@ export default class PreviewManager {
     studio.ui.hide();
   }
   
+  // Setup MutationObserver to ensure Theatre.js UI stays in our container
+  setupTheatreContainment() {
+    // Create observer to watch for Theatre.js elements outside our container
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach(mutation => {
+        if (mutation.addedNodes.length) {
+          mutation.addedNodes.forEach(node => {
+            // Check if it's a Theatre.js element outside our container
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const isTheatreElement = 
+                (node.className && typeof node.className === 'string' && 
+                 (node.className.includes('theatre') || node.className.includes('Theatre'))) ||
+                (node.id && typeof node.id === 'string' && 
+                 node.id.includes('theatre')) ||
+                node.hasAttribute('data-sheet') ||
+                node.hasAttribute('data-sequence-editor') ||
+                node.hasAttribute('data-dock');
+              
+              // If it's a Theatre element outside our container, move it in
+              if (isTheatreElement && !this.preview.contains(node)) {
+                console.log('Moving Theatre.js element back to container:', node);
+                
+                // First try to make it fit
+                node.style.position = 'absolute';
+                node.style.maxWidth = 'calc(100% - 20px)';
+                node.style.maxHeight = 'calc(100% - 20px)';
+                node.style.overflow = 'auto';
+                node.style.transform = 'none';
+                
+                // Move it inside our container
+                const theatreContainer = document.getElementById('theatre-container');
+                if (theatreContainer) {
+                  theatreContainer.appendChild(node);
+                }
+              }
+            }
+          });
+        }
+      });
+    });
+    
+    // Start observing the entire document
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true 
+    });
+    
+    // Store for cleanup
+    this.theatreObserver = observer;
+  }
+  
   // Clean up resources when no longer needed
   destroy() {
     if (this.animationFrame) {
@@ -389,6 +500,11 @@ export default class PreviewManager {
     const container = document.getElementById('theatre-container');
     if (container) {
       container.remove();
+    }
+    
+    // Clean up observers
+    if (this.theatreObserver) {
+      this.theatreObserver.disconnect();
     }
   }
 }
