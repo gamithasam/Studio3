@@ -304,58 +304,121 @@ export default class PreviewManager {
   
   // Setup observer to watch for scene changes
   setupSceneObserver() {
-    // Use a periodic function to check for new objects
+    // Keep track of objects we've already seen by UUID
+    this.observedObjects = new Set();
+    
+    // Create a handler for when objects are added
+    this.sceneChangeHandler = () => {
+      // Only scan if we're not currently scanning
+      if (!this.isScanning) {
+        this.scanSceneForNewObjects();
+      }
+    };
+    
+    // Set up a MutationObserver to detect when objects are added to the scene
+    const observer = new MutationObserver(mutations => {
+      // Check if any of the mutations involve the scene or its children
+      const shouldScan = mutations.some(mutation => {
+        return this.scene.contains(mutation.target) || mutation.target === this.scene;
+      });
+      
+      if (shouldScan) {
+        this.sceneChangeHandler();
+      }
+    });
+    
+    // Do an initial scan after a short delay to let the scene initialize
+    setTimeout(() => this.scanSceneForNewObjects(), 500);
+    
+    // Setup custom function to intercept object additions to the scene
+    const originalAdd = this.scene.add;
+    this.scene.add = (...objects) => {
+      const result = originalAdd.apply(this.scene, objects);
+      this.sceneChangeHandler();
+      return result;
+    };
+    
+    // No need for frequent interval scanning - we'll use the above approaches instead
+    // Only do occasional checks in case we miss something
     this.sceneCheckInterval = setInterval(() => {
       this.scanSceneForNewObjects();
-    }, 1000); // Check every second
+    }, 5000); // Reduced from every 1 second to every 5 seconds
     
-    // Also scan at the beginning
-    setTimeout(() => this.scanSceneForNewObjects(), 100);
+    return observer;
   }
   
   // Scan the scene for objects not yet registered with Theatre.js
   scanSceneForNewObjects() {
-    // Counter for generating shorter IDs
+    // Flag to prevent concurrent scanning
+    this.isScanning = true;
+    
+    // Counter for generating IDs if needed
     if (!this.objectIdCounter) {
       this.objectIdCounter = 0;
     }
     
     const processObject = (obj, prefix = '') => {
-      // Generate shorter object ID
-      // Instead of full UUID, use type + counter or truncated ID
-      const shortId = obj.name || 
-                     (obj.type ? `${obj.type}_${this.objectIdCounter++}` : 
-                     (obj.uuid ? `obj_${obj.uuid.substring(0, 8)}` : `obj_${this.objectIdCounter++}`));
+      // Skip if it's the camera - we handle that separately
+      if (obj === this.camera) return;
+      
+      // Use UUID for stable identification across scans
+      const objUuid = obj.uuid;
+      
+      // Skip if we've already processed this object
+      if (this.observedObjects.has(objUuid)) return;
+      
+      // Mark as observed
+      this.observedObjects.add(objUuid);
+      
+      // Generate a consistent ID based on type and name if available
+      let shortId;
+      if (obj.name) {
+        shortId = obj.name;
+      } else if (obj.type) {
+        shortId = `${obj.type}_${this.objectIdCounter++}`;
+      } else {
+        shortId = `obj_${objUuid.substring(0, 8)}`;
+      }
       
       const objectId = prefix + shortId;
       
-      // Make sure our ID is not too long for Theatre.js (max 64 chars)
+      // Ensure ID is not too long for Theatre.js (max 64 chars)
       const finalObjectId = objectId.length > 60 ? objectId.substring(0, 60) : objectId;
       
-      // Skip if already registered
-      if (!this.theatreObjects.has(finalObjectId) && obj !== this.camera) {
-        // Register visible objects that can be animated
-        if (obj.visible !== undefined && 
-            (obj.position || obj.rotation || obj.scale)) {
+      // Register animatable objects
+      if (obj.visible !== undefined && (obj.position || obj.rotation || obj.scale)) {
+        // Check if we already have this object registered by another ID
+        let alreadyRegistered = false;
+        this.theatreObjects.forEach((value) => {
+          if (value.threeObject === obj) {
+            alreadyRegistered = true;
+          }
+        });
+        
+        if (!alreadyRegistered) {
           this.registerObjectWithTheatre(obj, finalObjectId);
         }
       }
       
       // Process children recursively
-      if (obj.children) {
+      if (obj.children && obj.children.length > 0) {
         obj.children.forEach((child, index) => {
-          // Keep child prefixes short
           processObject(child, `${prefix}c${index}_`);
         });
       }
     };
     
-    // Process all scene children
-    this.scene.children.forEach((obj, index) => {
-      if (obj !== this.camera) { // Skip camera as it's already registered
-        processObject(obj, `obj${index}_`);
-      }
-    });
+    // Process all direct scene children
+    if (this.scene && this.scene.children) {
+      this.scene.children.forEach((obj, index) => {
+        if (obj !== this.camera) {
+          processObject(obj, `obj${index}_`);
+        }
+      });
+    }
+    
+    // Done scanning
+    this.isScanning = false;
   }
   
   // Register a Three.js object with Theatre.js for animation control
@@ -520,6 +583,11 @@ export default class PreviewManager {
     // Clean up observers
     if (this.theatreObserver) {
       this.theatreObserver.disconnect();
+    }
+
+    // Restore original scene.add method if we modified it
+    if (this.scene && this.scene.add && this.scene.add !== THREE.Object3D.prototype.add) {
+      this.scene.add = THREE.Object3D.prototype.add;
     }
   }
 }
