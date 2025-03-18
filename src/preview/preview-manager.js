@@ -315,22 +315,37 @@ export default class PreviewManager {
   
   // Scan the scene for objects not yet registered with Theatre.js
   scanSceneForNewObjects() {
+    // Counter for generating shorter IDs
+    if (!this.objectIdCounter) {
+      this.objectIdCounter = 0;
+    }
+    
     const processObject = (obj, prefix = '') => {
-      const objectId = prefix + (obj.name || obj.uuid);
+      // Generate shorter object ID
+      // Instead of full UUID, use type + counter or truncated ID
+      const shortId = obj.name || 
+                     (obj.type ? `${obj.type}_${this.objectIdCounter++}` : 
+                     (obj.uuid ? `obj_${obj.uuid.substring(0, 8)}` : `obj_${this.objectIdCounter++}`));
+      
+      const objectId = prefix + shortId;
+      
+      // Make sure our ID is not too long for Theatre.js (max 64 chars)
+      const finalObjectId = objectId.length > 60 ? objectId.substring(0, 60) : objectId;
       
       // Skip if already registered
-      if (!this.theatreObjects.has(objectId) && obj !== this.camera) {
+      if (!this.theatreObjects.has(finalObjectId) && obj !== this.camera) {
         // Register visible objects that can be animated
         if (obj.visible !== undefined && 
             (obj.position || obj.rotation || obj.scale)) {
-          this.registerObjectWithTheatre(obj, objectId);
+          this.registerObjectWithTheatre(obj, finalObjectId);
         }
       }
       
       // Process children recursively
       if (obj.children) {
         obj.children.forEach((child, index) => {
-          processObject(child, `${objectId}_child${index}_`);
+          // Keep child prefixes short
+          processObject(child, `${prefix}c${index}_`);
         });
       }
     };
@@ -338,7 +353,7 @@ export default class PreviewManager {
     // Process all scene children
     this.scene.children.forEach((obj, index) => {
       if (obj !== this.camera) { // Skip camera as it's already registered
-        processObject(obj, `sceneObj${index}_`);
+        processObject(obj, `obj${index}_`);
       }
     });
   }
