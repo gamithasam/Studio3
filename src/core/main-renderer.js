@@ -83,8 +83,8 @@ export default class MainRenderer {
     this.layoutManager = new LayoutManager();
     this.layoutManager.init();
     
-    // Initialize preview manager
-    this.previewManager = new PreviewManager();
+    // Initialize preview manager with app state
+    this.previewManager = new PreviewManager(this.appState);
     const scene = this.previewManager.init();
     
     // Initialize slide manager
@@ -202,6 +202,13 @@ export default class MainRenderer {
     this.eventBus.on('state:isPlaying', (data) => {
       this.playBtn.textContent = data.value ? '■ Stop' : '▶ Play';
     });
+
+    // Add listener for aspect ratio changes from main process
+    if (window.electron && window.electron.onAspectRatioChanged) {
+      this.aspectRatioCleanup = window.electron.onAspectRatioChanged((aspectRatio) => {
+        this.appState.setState({ aspectRatio });
+      });
+    }
   }
   
   runUserCode(code) {
@@ -292,6 +299,11 @@ export default class MainRenderer {
   }
   
   cleanup() {
+    // Clean up aspect ratio listener if it exists
+    if (this.aspectRatioCleanup) {
+      this.aspectRatioCleanup();
+    }
+    
     // Clean up controllers
     if (this.presentationController) {
       this.presentationController.destroy();

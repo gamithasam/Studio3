@@ -28,3 +28,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPrepareForCapture: (callback) => ipcRenderer.on('prepare-for-capture', (_, value) => callback(value)),
   onCaptureComplete: (callback) => ipcRenderer.on('capture-complete', callback)
 });
+
+contextBridge.exposeInMainWorld('electron', {
+  // Add a listener for aspect ratio changes
+  onAspectRatioChanged: (callback) => {
+    ipcRenderer.on('aspect-ratio-changed', (_, data) => callback(data));
+    
+    // Return a cleanup function
+    return () => {
+      ipcRenderer.removeAllListeners('aspect-ratio-changed');
+    };
+  }
+});

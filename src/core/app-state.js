@@ -12,7 +12,11 @@ export default class AppState {
       isPlaying: false,
       currentSlideIndex: 0,
       isPaused: false,
-      isExporting: false
+      isExporting: false,
+      aspectRatio: {
+        width: 16,
+        height: 9
+      }
     };
   }
 

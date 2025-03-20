@@ -5,7 +5,7 @@ import studio from '@theatre/studio'
 import { getProject } from '@theatre/core'
 
 export default class PreviewManager {
-  constructor() {
+  constructor(appState) {
     this.canvas = document.getElementById('threeCanvas');
     this.preview = document.getElementById('preview');
     this.scene = null;
@@ -19,9 +19,23 @@ export default class PreviewManager {
     this.theatreSheet = null;
     this.theatreObjects = new Map(); // Track objects added to Theatre.js
     this.sceneObserver = null; // Observer for scene children changes
+    
+    // Store reference to app state
+    this.appState = appState;
+    
+    // Default aspect ratio (will be updated from app state)
+    this.aspectRatio = {
+      width: 16,
+      height: 9
+    };
   }
   
   init() {
+    // Update aspect ratio from app state if available
+    if (this.appState && this.appState.getState('aspectRatio')) {
+      this.aspectRatio = this.appState.getState('aspectRatio');
+    }
+    
     // Clear Theatre.js data from localStorage on startup
     this.clearTheatreJsLocalStorage();
     
@@ -67,6 +81,11 @@ export default class PreviewManager {
     this.startAnimation();
     window.addEventListener('resize', this.handleResize.bind(this));
     
+    // Subscribe to aspect ratio changes
+    if (this.appState && this.appState.eventBus) {
+      this.appState.eventBus.on('state:aspectRatio', this.handleAspectRatioChange.bind(this));
+    }
+    
     return this.scene;
   }
   
@@ -74,25 +93,34 @@ export default class PreviewManager {
     this.resizeRenderer();
   }
   
+  handleAspectRatioChange(data) {
+    if (data && data.value) {
+      this.aspectRatio = data.value;
+      this.resizeRenderer();
+    }
+  }
+  
   resizeRenderer() {
     const previewRect = this.preview.getBoundingClientRect();
     let newWidth, newHeight;
     
-    // Always calculate dimensions based on a fixed 16:9 ratio
-    if (previewRect.width / previewRect.height > 16 / 9) {
+    // Calculate dimensions based on the current aspect ratio
+    const aspectRatioValue = this.aspectRatio.width / this.aspectRatio.height;
+    
+    if (previewRect.width / previewRect.height > aspectRatioValue) {
       // Width is limiting factor
       newHeight = previewRect.height;
-      newWidth = newHeight * (16 / 9);
+      newWidth = newHeight * aspectRatioValue;
     } else {
       // Height is limiting factor
       newWidth = previewRect.width;
-      newHeight = newWidth / (16 / 9);
+      newHeight = newWidth / aspectRatioValue;
     }
     
-    // Set the renderer size to maintain 16:9
+    // Set the renderer size to maintain the selected aspect ratio
     if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
       this.renderer.setSize(newWidth, newHeight, false);
-      this.camera.aspect = 16 / 9; // Force 16:9 aspect ratio
+      this.camera.aspect = aspectRatioValue; // Set camera aspect ratio
       this.camera.updateProjectionMatrix();
     }
     
@@ -654,6 +682,11 @@ export default class PreviewManager {
     // Restore original scene.add method if we modified it
     if (this.scene && this.scene.add && this.scene.add !== THREE.Object3D.prototype.add) {
       this.scene.add = THREE.Object3D.prototype.add;
+    }
+    
+    // Unsubscribe from events
+    if (this.appState && this.appState.eventBus) {
+      this.appState.eventBus.clear('state:aspectRatio');
     }
   }
 }

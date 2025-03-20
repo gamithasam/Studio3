@@ -166,7 +166,39 @@ function createMenu() {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { role: 'togglefullscreen' },
+        { type: 'separator' },
+        {
+          label: 'Aspect Ratio',
+          submenu: [
+            {
+              label: '16:9 (Widescreen)',
+              type: 'radio',
+              checked: true,
+              click: () => mainWindow.webContents.send('aspect-ratio-changed', { width: 16, height: 9 })
+            },
+            {
+              label: '4:3 (Standard)',
+              type: 'radio',
+              click: () => mainWindow.webContents.send('aspect-ratio-changed', { width: 4, height: 3 })
+            },
+            {
+              label: '1:1 (Square)',
+              type: 'radio',
+              click: () => mainWindow.webContents.send('aspect-ratio-changed', { width: 1, height: 1 })
+            },
+            {
+              label: '9:16 (Portrait)',
+              type: 'radio',
+              click: () => mainWindow.webContents.send('aspect-ratio-changed', { width: 9, height: 16 })
+            },
+            {
+              label: '21:9 (Ultrawide)',
+              type: 'radio',
+              click: () => mainWindow.webContents.send('aspect-ratio-changed', { width: 21, height: 9 })
+            }
+          ]
+        }
       ]
     },
     {
