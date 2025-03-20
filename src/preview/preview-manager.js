@@ -22,6 +22,9 @@ export default class PreviewManager {
   }
   
   init() {
+    // Clear Theatre.js data from localStorage on startup
+    this.clearTheatreJsLocalStorage();
+    
     // Set up Three.js
     this.renderer = new THREE.WebGLRenderer({ 
       canvas: this.canvas,
@@ -37,15 +40,22 @@ export default class PreviewManager {
     // Create container for Theatre.js UI
     this.createTheatreContainer();
     
-    // Initialize Theatre.js with custom container
+    // Initialize Theatre.js with custom container and disable autosave
     studio.initialize({
-      container: document.getElementById('theatre-container')
+      container: document.getElementById('theatre-container'),
+      autosave: false
     });
     
     // Set up mutation observer to contain Theatre.js UI
     this.setupTheatreContainment();
     
-    this.theatreProject = getProject('Studio3 Project');
+    // Create a new project with autosave disabled, without specifying a state
+    // This allows Theatre.js to create a default state structure
+    this.theatreProject = getProject('Studio3 Project', {
+      autosave: false,
+      // Don't specify state, let Theatre.js handle default initialization
+    });
+    
     this.theatreSheet = this.theatreProject.sheet('Scene');
     
     // Register camera with Theatre.js
@@ -466,13 +476,16 @@ export default class PreviewManager {
       };
     }
     
-    // Create Theatre.js object
-    const theatreObject = this.theatreSheet.object(objectId, props);
+    // Create Theatre.js object with non-persistent state
+    const theatreObject = this.theatreSheet.object(objectId, props, {
+      reconfigure: true  // Always reconfigure with current values instead of using saved state
+    });
 
-    // Store reference to the object
+    // Store reference to the object and the initial values
     this.theatreObjects.set(objectId, {
       threeObject: object,
-      theatreObject: theatreObject
+      theatreObject: theatreObject,
+      initialValues: JSON.parse(JSON.stringify(props)) // Store initial values for reset
     });
 
     return theatreObject;
@@ -546,8 +559,45 @@ export default class PreviewManager {
     this.theatreObserver = observer;
   }
   
+  // Clear Theatre.js data from localStorage
+  clearTheatreJsLocalStorage() {
+    // Clear any Theatre.js related items from localStorage
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes('theatre') || key.includes('Theatre')) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('Cleared Theatre.js data from localStorage');
+  }
+  
+  // Reset Theatre.js state to initial values
+  resetTheatreState() {
+    // Reset the entire Theatre.js project state
+    if (this.theatreProject) {
+      this.theatreProject.ready.then(() => {
+        // Re-create the sheet without specifying state
+        this.theatreSheet = this.theatreProject.sheet('Scene');
+        
+        // Re-register all objects with their current values
+        const objectsToRestore = new Map(this.theatreObjects);
+        this.theatreObjects.clear();
+        
+        objectsToRestore.forEach(({threeObject}, objectId) => {
+          if (threeObject) {
+            this.registerObjectWithTheatre(threeObject, objectId);
+          }
+        });
+        
+        console.log('Reset Theatre.js state to initial values');
+      });
+    }
+  }
+  
   // Clean up resources when no longer needed
   destroy() {
+    // Clear any Theatre.js localStorage data on shutdown
+    this.clearTheatreJsLocalStorage();
+    
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
     }
