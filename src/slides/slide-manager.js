@@ -11,12 +11,36 @@ export default class SlideManager {
     this.scene = null;
     this.slidesList = document.getElementById('slidesList');
     
+    // Default aspect ratio (will be updated from app state)
+    this.aspectRatio = {
+      width: 16,
+      height: 9
+    };
+    
     // Create the 2D overlay for slide content
     this._createOverlay();
+    
+    // Listen for window resize events
+    window.addEventListener('resize', this.handleResize.bind(this));
   }
   
-  init(scene) {
+  init(scene, appState) {
     this.scene = scene;
+    
+    // Store reference to app state if provided
+    this.appState = appState;
+    
+    // Update aspect ratio from app state if available
+    if (this.appState && this.appState.getState('aspectRatio')) {
+      this.aspectRatio = this.appState.getState('aspectRatio');
+      this.resizeOverlay();
+    }
+    
+    // Subscribe to aspect ratio changes
+    if (this.appState && this.appState.eventBus) {
+      this.appState.eventBus.on('state:aspectRatio', this.handleAspectRatioChange.bind(this));
+    }
+    
     return this;
   }
   
@@ -41,6 +65,58 @@ export default class SlideManager {
     
     // Make overlay2D clickable
     this.overlay2D.style.pointerEvents = 'auto';
+    
+    // Initial resize
+    setTimeout(() => this.resizeOverlay(), 0);
+  }
+  
+  handleResize() {
+    this.resizeOverlay();
+  }
+  
+  handleAspectRatioChange(data) {
+    if (data && data.value) {
+      this.aspectRatio = data.value;
+      this.resizeOverlay();
+    }
+  }
+  
+  resizeOverlay() {
+    const preview = document.getElementById('preview');
+    if (!preview || !this.overlay2D) return;
+    
+    const previewRect = preview.getBoundingClientRect();
+    let newWidth, newHeight;
+    
+    // Calculate dimensions based on the current aspect ratio
+    const aspectRatioValue = this.aspectRatio.width / this.aspectRatio.height;
+    
+    if (previewRect.width / previewRect.height > aspectRatioValue) {
+      // Width is limiting factor
+      newHeight = previewRect.height;
+      newWidth = newHeight * aspectRatioValue;
+    } else {
+      // Height is limiting factor
+      newWidth = previewRect.width;
+      newHeight = newWidth / aspectRatioValue;
+    }
+    
+    // Apply the calculated size to the overlay
+    this.overlay2D.style.width = `${newWidth}px`;
+    this.overlay2D.style.height = `${newHeight}px`;
+    this.overlay2D.style.position = 'absolute';
+    this.overlay2D.style.left = '50%';
+    this.overlay2D.style.top = '50%';
+    this.overlay2D.style.transform = 'translate(-50%, -50%)';
+    
+    // Update each slide container to match the overlay size
+    this.slidesArray.forEach((_, idx) => {
+      const container = this.getSlideContainer(idx);
+      if (container) {
+        container.style.width = '100%';
+        container.style.height = '100%';
+      }
+    });
   }
   
   loadSlides(slides, projectManager) {
@@ -193,6 +269,14 @@ export default class SlideManager {
   
   // Clean up any resources
   destroy() {
+    // Remove window resize listener
+    window.removeEventListener('resize', this.handleResize.bind(this));
+    
+    // Unsubscribe from aspect ratio changes
+    if (this.appState && this.appState.eventBus) {
+      this.appState.eventBus.clear('state:aspectRatio');
+    }
+    
     // Remove all slide containers
     if (this.overlay2D) {
       while (this.overlay2D.firstChild) {
