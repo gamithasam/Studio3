@@ -75,21 +75,37 @@ export default class PreviewManager {
   }
   
   resizeRenderer() {
+    const previewRect = this.preview.getBoundingClientRect();
     let newWidth, newHeight;
-    if (document.fullscreenElement) {
-      const previewRect = this.preview.getBoundingClientRect();
-      // Calculate dimensions based on a fixed 16:9 ratio. We'll choose the largest size that fits
-      newWidth = Math.min(previewRect.width, previewRect.height * (16 / 9));
-      newHeight = newWidth / (16 / 9);
+    
+    // Always calculate dimensions based on a fixed 16:9 ratio
+    if (previewRect.width / previewRect.height > 16 / 9) {
+      // Width is limiting factor
+      newHeight = previewRect.height;
+      newWidth = newHeight * (16 / 9);
     } else {
-      newWidth = this.canvas.clientWidth;
-      newHeight = this.canvas.clientHeight;
+      // Height is limiting factor
+      newWidth = previewRect.width;
+      newHeight = newWidth / (16 / 9);
     }
+    
+    // Set the renderer size to maintain 16:9
     if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
       this.renderer.setSize(newWidth, newHeight, false);
-      this.camera.aspect = newWidth / newHeight;
+      this.camera.aspect = 16 / 9; // Force 16:9 aspect ratio
       this.camera.updateProjectionMatrix();
     }
+    
+    // Center the canvas in the container
+    this.canvas.style.position = 'absolute';
+    this.canvas.style.left = '50%';
+    this.canvas.style.top = '50%';
+    this.canvas.style.transform = 'translate(-50%, -50%)';
+    this.canvas.style.width = `${newWidth}px`;
+    this.canvas.style.height = `${newHeight}px`;
+    
+    // Set a neutral background color
+    this.preview.style.backgroundColor = '#222222';
   }
   
   startAnimation() {
