@@ -139,22 +139,52 @@ html, body {
     display: none;
 }
 
-/* Left panel container collapsed state */
+/* Left panel container collapsed state - UPDATED for floating button style */
 .left-panel-container.collapsed {
-    width: 40px;
+    width: auto;
+    min-width: auto;
+    height: auto;
+    position: absolute;
+    top: 42px; /* Position below the title bar (32px + 10px margin) */
+    left: 15px;
+    background: transparent;
+    border-right: none;
+    z-index: 20;
 }
 
 .left-panel-container.collapsed .left-panel-header {
-    background: #252526; /* Match the side panel background */
-    justify-content: center; /* Center the icon */
-    border-bottom: none; /* Remove the border for cleaner look */
+    background: transparent;
+    padding: 0;
+    border-bottom: none;
+    height: auto;
 }
 
-.left-panel-container.collapsed .media-panel,
-.left-panel-container.collapsed .slides-panel,
-.left-panel-container.collapsed .panel-resize-handle,
-.left-panel-container.collapsed .add-button {
-    display: none;
+.left-panel-container.collapsed .sidebar-toggle {
+    background: #333333;
+    border-radius: 6px;
+    width: 36px;
+    height: 36px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.left-panel-container.collapsed .sidebar-toggle:hover {
+    background: #444444;
+}
+
+/* Remove the full-height bar style that was previously defined */
+.left-panel-container.collapsed {
+    width: auto;
+}
+
+/* When panel is not collapsed, ensure proper positioning */
+.left-panel-container:not(.collapsed) {
+    position: relative;
+}
+
+/* Ensure toolbar doesn't overlap with the floating sidebar toggle */
+.toolbar {
+    /* Move it a bit to the right to avoid overlap with the floating sidebar button */
+    margin-left: 30px;
 }
 
 /* Media panel */
@@ -314,22 +344,29 @@ html, body {
     overflow: hidden;
 }
 
-/* Toolbar */
+/* Toolbar - UPDATED position to be at the same level as sidebar toggle */
 .toolbar {
+    position: absolute;
+    top: 42px; /* Match position with sidebar toggle button */
+    left: 50%;
+    transform: translateX(-50%);
     height: 40px;
     background: #333333;
     display: flex;
     align-items: center;
     padding: 0 10px;
     gap: 10px;
-    flex-shrink: 0;
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    margin-left: 0; /* Remove the previously added margin */
 }
 
-/* Editor and preview container */
+/* Editor and preview container - UPDATED to account for floating toolbar */
 .editor-preview-container {
     display: flex;
     flex: 1;
-    height: calc(100% - 40px); /* Subtract toolbar height */
+    height: calc(100% - 50px); /* Make space for the floating toolbar */
     overflow: hidden;
 }
 
@@ -491,17 +528,19 @@ button:hover {
 /* Bottom pane styling */
 .bottom-pane {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    width: calc(100% - 32px);
+    top: 0;
+    right: 0;
+    width: 300px;
+    height: 100%;
     background: #252526;
-    border-top: 1px solid #333;
+    border-left: 1px solid #333;
     padding: 16px;
     display: none;
     flex-direction: column;
     gap: 16px;
     z-index: 2;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+    overflow-y: auto;
 }
 
 .bottom-pane.visible {
@@ -510,8 +549,8 @@ button:hover {
 
 #closeBottomPane {
     position: absolute;
-    right: 5px;
-    top: 5px;
+    right: 10px;
+    top: 10px;
     background: transparent;
     border: none;
     color: #888;
@@ -526,12 +565,13 @@ button:hover {
 }
 
 #propertyControls {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 24px;
     align-items: start;
     max-width: 100%;
     overflow-x: hidden;
+    margin-top: 30px; /* Space for close button */
 }
 
 .control-group {
@@ -539,6 +579,7 @@ button:hover {
     flex-direction: column;
     gap: 8px;
     min-width: 0;
+    width: 100%;
 }
 
 .control-group label {
@@ -734,4 +775,14 @@ datalist option:hover {
   gap: 10px;
   align-content: flex-start;
   height: calc(100% - 40px); /* Account for header height */
+}
+
+/* Adjust preview to make space for right sidebar when properties panel is open */
+#preview.with-properties {
+    width: calc(100% - 300px);
+}
+
+/* Adjust editor width when properties panel is open */
+.editor-section.with-properties {
+    width: calc(50% - 150px);
 }
