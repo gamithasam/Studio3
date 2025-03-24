@@ -154,8 +154,26 @@ export default class MainRenderer {
     // Play button - start/stop presentation
     this.playBtn.addEventListener('click', this.togglePresentation.bind(this));
     
-    // Zoom button - toggle zoom levels
-    this.zoomBtn.addEventListener('click', this.handleZoomToggle.bind(this));
+    // Zoom button - show dropdown instead of toggling zoom
+    this.zoomBtn.addEventListener('click', this.toggleZoomDropdown.bind(this));
+    
+    // Add event listeners for zoom options
+    const zoomOptions = document.querySelectorAll('.zoom-option');
+    zoomOptions.forEach(option => {
+      option.addEventListener('click', this.handleZoomOptionClick.bind(this));
+    });
+    
+    // Close zoom dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const zoomDropdown = document.getElementById('zoomDropdown');
+      const zoomBtn = document.getElementById('zoomBtn');
+      
+      if (zoomDropdown.classList.contains('visible') && 
+          !zoomDropdown.contains(e.target) && 
+          e.target !== zoomBtn) {
+        zoomDropdown.classList.remove('visible');
+      }
+    });
     
     // Key events for navigation and shortcuts
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
@@ -213,6 +231,93 @@ export default class MainRenderer {
         this.appState.setState({ aspectRatio });
       });
     }
+  }
+
+  // Toggle zoom dropdown visibility
+  toggleZoomDropdown(e) {
+    e.stopPropagation();
+    const zoomDropdown = document.getElementById('zoomDropdown');
+    zoomDropdown.classList.toggle('visible');
+    
+    // Update active class based on current zoom level
+    this.updateActiveZoomOption();
+  }
+  
+  // Handle zoom option click
+  handleZoomOptionClick(e) {
+    const zoomLevel = e.target.getAttribute('data-zoom');
+    const zoomDropdown = document.getElementById('zoomDropdown');
+    
+    if (zoomLevel === 'fit') {
+      this.fitSlideToView();
+    } else {
+      const numericZoom = parseFloat(zoomLevel);
+      this.setZoomLevel(numericZoom);
+    }
+    
+    // Hide dropdown after selection
+    zoomDropdown.classList.remove('visible');
+  }
+  
+  // Set a specific zoom level
+  setZoomLevel(level) {
+    if (this.previewManager) {
+      const zoomLevel = this.previewManager.setZoom(level, this.slideManager);
+      this.zoomBtn.textContent = `🔍 ${Math.round(zoomLevel * 100)}%`;
+      this.updateActiveZoomOption();
+    }
+  }
+  
+  // Fit slide to view (calculate optimal zoom level based on container size)
+  fitSlideToView() {
+    if (this.previewManager && this.slideManager) {
+      const preview = document.getElementById('preview');
+      const previewRect = preview.getBoundingClientRect();
+      
+      const aspectRatio = this.appState.getState('aspectRatio');
+      const aspectRatioValue = aspectRatio.width / aspectRatio.height;
+      
+      // Calculate target area (constant from preview-manager.js)
+      const targetArea = 1280 * 720;
+      const baseWidth = Math.sqrt(targetArea * aspectRatioValue);
+      
+      // Calculate zoom level to fit preview container
+      let fitZoom;
+      if (previewRect.width / previewRect.height > aspectRatioValue) {
+        // Height is limiting factor
+        fitZoom = previewRect.height / (baseWidth / aspectRatioValue);
+      } else {
+        // Width is limiting factor
+        fitZoom = previewRect.width / baseWidth;
+      }
+      
+      // Apply a margin factor to ensure it fits with some padding
+      fitZoom = fitZoom * 0.9;
+      
+      this.setZoomLevel(fitZoom);
+      this.zoomBtn.textContent = `🔍 Fit`;
+    }
+  }
+  
+  // Update active class on zoom options
+  updateActiveZoomOption() {
+    if (!this.previewManager) return;
+    
+    const currentZoom = this.previewManager.zoomLevel;
+    const zoomOptions = document.querySelectorAll('.zoom-option');
+    
+    zoomOptions.forEach(option => {
+      const optionZoom = option.getAttribute('data-zoom');
+      
+      if (optionZoom === 'fit') {
+        // Special case for "Fit" option
+        option.classList.remove('active');
+      } else if (Math.abs(parseFloat(optionZoom) - currentZoom) < 0.01) {
+        option.classList.add('active');
+      } else {
+        option.classList.remove('active');
+      }
+    });
   }
   
   runUserCode(code) {
@@ -325,15 +430,6 @@ export default class MainRenderer {
     // Clear event bus
     if (this.eventBus) {
       this.eventBus.clear();
-    }
-  }
-
-  // Add handler for zoom button clicks
-  handleZoomToggle() {
-    if (this.previewManager) {
-      const zoomLevel = this.previewManager.toggleZoom(this.slideManager);
-      // Update zoom button text to show current zoom level
-      this.zoomBtn.textContent = `🔍 ${zoomLevel.toFixed(1)}x`;
     }
   }
 }

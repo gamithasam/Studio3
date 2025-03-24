@@ -695,31 +695,7 @@ export default class PreviewManager {
     }
   }
 
-  // Add a method to toggle zoom levels
-  toggleZoom(slideManager) {
-    // Increase zoom level by one step
-    this.zoomLevel += this.zoomStep;
-    
-    // Loop back to minimum zoom when maximum is exceeded
-    if (this.zoomLevel > this.zoomMax) {
-      this.zoomLevel = this.zoomMin;
-    }
-    
-    // Apply zoom by resizing the renderer
-    this.resizeRenderer();
-    
-    // Update the slide manager if provided
-    if (slideManager) {
-      slideManager.updateZoomLevel(this.zoomLevel);
-    }
-    
-    console.log(`Zoom level: ${this.zoomLevel.toFixed(2)}x`);
-    
-    // Return current zoom level to display in UI if needed
-    return this.zoomLevel;
-  }
-  
-  // Add a method to set a specific zoom level
+  // Update setZoom to clamp to valid range and return actual zoom level applied
   setZoom(level, slideManager) {
     // Clamp zoom level to valid range
     this.zoomLevel = Math.max(this.zoomMin, Math.min(this.zoomMax, level));
@@ -732,6 +708,9 @@ export default class PreviewManager {
       slideManager.updateZoomLevel(this.zoomLevel);
     }
     
+    console.log(`Zoom level set to: ${this.zoomLevel.toFixed(2)}x`);
+    
+    // Return current zoom level
     return this.zoomLevel;
   }
 }

@@ -87,7 +87,23 @@
         <div class="toolbar">
           <button id="toolbarAddSlideBtn">Add New Slide</button>
           <button id="playBtn">▶ Play</button>
-          <button id="zoomBtn">🔍 Zoom</button>
+          
+          <!-- Replace simple zoom button with dropdown container -->
+          <div class="zoom-dropdown-container">
+            <button id="zoomBtn">🔍 100%</button>
+            <div class="zoom-dropdown" id="zoomDropdown">
+              <div class="zoom-option" data-zoom="0.25">25%</div>
+              <div class="zoom-option" data-zoom="0.5">50%</div>
+              <div class="zoom-option" data-zoom="0.75">75%</div>
+              <div class="zoom-option" data-zoom="1.0">100%</div>
+              <div class="zoom-option" data-zoom="1.25">125%</div>
+              <div class="zoom-option" data-zoom="1.5">150%</div>
+              <div class="zoom-option" data-zoom="2.0">200%</div>
+              <div class="zoom-option" data-zoom="3.0">300%</div>
+              <div class="zoom-option" data-zoom="4.0">400%</div>
+              <div class="zoom-option" data-zoom="fit">Fit slide</div>
+            </div>
+          </div>
         </div>
         
         <div class="editor-preview-container">
