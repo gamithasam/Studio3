@@ -31,8 +31,8 @@ export default class PreviewManager {
 
     // Add zoom level tracking
     this.zoomLevel = 1;
-    this.zoomMin = 0.5;
-    this.zoomMax = 2.5;
+    this.zoomMin = 0.25; // Changed from 0.5 to allow 25% zoom
+    this.zoomMax = 4.0;  // Changed from 2.5 to allow 300% and 400% zoom
     this.zoomStep = 0.25;
   }
   
