@@ -93,8 +93,13 @@ export default class SlideManager {
     // Calculate aspect ratio
     const aspectRatioValue = this.aspectRatio.width / this.aspectRatio.height;
     
-    // Base width and apply zoom factor
-    const baseWidth = 1280;
+    // Calculate base dimensions based on aspect ratio
+    // Use a constant target area rather than fixed width
+    const targetArea = 1280 * 720; // Target area in pixels (approximately 921,600 px)
+    const baseWidth = Math.sqrt(targetArea * aspectRatioValue);
+    const baseHeight = baseWidth / aspectRatioValue;
+    
+    // Apply zoom factor to get actual dimensions
     const zoomedWidth = baseWidth * this.zoomLevel;
     const zoomedHeight = zoomedWidth / aspectRatioValue;
     

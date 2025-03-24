@@ -112,8 +112,11 @@ export default class PreviewManager {
     // Calculate aspect ratio
     const aspectRatioValue = this.aspectRatio.width / this.aspectRatio.height;
     
-    // Base width for 1.0 zoom level
-    const baseWidth = 1280;
+    // Calculate base dimensions based on aspect ratio
+    // Use a constant target area rather than fixed width
+    const targetArea = 1280 * 720; // Target area in pixels (approximately 921,600 px)
+    const baseWidth = Math.sqrt(targetArea * aspectRatioValue);
+    const baseHeight = baseWidth / aspectRatioValue;
     
     // Apply zoom factor to get actual dimensions
     const zoomedWidth = baseWidth * this.zoomLevel;
