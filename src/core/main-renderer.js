@@ -35,6 +35,7 @@ export default class MainRenderer {
     this.addSlideBtn = document.getElementById('addSlideBtn');
     this.toolbarAddSlideBtn = document.getElementById('toolbarAddSlideBtn');
     this.addMediaBtn = document.getElementById('addMediaBtn');
+    this.zoomBtn = document.getElementById('zoomBtn'); // Add reference to zoom button
     
     // Make external libraries available
     window.Water = Water;
@@ -152,6 +153,9 @@ export default class MainRenderer {
     
     // Play button - start/stop presentation
     this.playBtn.addEventListener('click', this.togglePresentation.bind(this));
+    
+    // Zoom button - toggle zoom levels
+    this.zoomBtn.addEventListener('click', this.handleZoomToggle.bind(this));
     
     // Key events for navigation and shortcuts
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
@@ -321,6 +325,15 @@ export default class MainRenderer {
     // Clear event bus
     if (this.eventBus) {
       this.eventBus.clear();
+    }
+  }
+
+  // Add handler for zoom button clicks
+  handleZoomToggle() {
+    if (this.previewManager) {
+      const zoomLevel = this.previewManager.toggleZoom(this.slideManager);
+      // Update zoom button text to show current zoom level
+      this.zoomBtn.textContent = `🔍 ${zoomLevel.toFixed(1)}x`;
     }
   }
 }

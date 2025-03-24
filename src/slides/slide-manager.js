@@ -17,6 +17,9 @@ export default class SlideManager {
       height: 9
     };
     
+    // Add zoom level property to match PreviewManager
+    this.zoomLevel = 1;
+    
     // Create the 2D overlay for slide content
     this._createOverlay();
     
@@ -86,24 +89,18 @@ export default class SlideManager {
     if (!preview || !this.overlay2D) return;
     
     const previewRect = preview.getBoundingClientRect();
-    let newWidth, newHeight;
     
-    // Calculate dimensions based on the current aspect ratio
+    // Calculate aspect ratio
     const aspectRatioValue = this.aspectRatio.width / this.aspectRatio.height;
     
-    if (previewRect.width / previewRect.height > aspectRatioValue) {
-      // Width is limiting factor
-      newHeight = previewRect.height;
-      newWidth = newHeight * aspectRatioValue;
-    } else {
-      // Height is limiting factor
-      newWidth = previewRect.width;
-      newHeight = newWidth / aspectRatioValue;
-    }
+    // Base width and apply zoom factor
+    const baseWidth = 1280;
+    const zoomedWidth = baseWidth * this.zoomLevel;
+    const zoomedHeight = zoomedWidth / aspectRatioValue;
     
     // Apply the calculated size to the overlay
-    this.overlay2D.style.width = `${newWidth}px`;
-    this.overlay2D.style.height = `${newHeight}px`;
+    this.overlay2D.style.width = `${zoomedWidth}px`;
+    this.overlay2D.style.height = `${zoomedHeight}px`;
     this.overlay2D.style.position = 'absolute';
     this.overlay2D.style.left = '50%';
     this.overlay2D.style.top = '50%';
@@ -265,6 +262,12 @@ export default class SlideManager {
   // Get the 2D overlay element for attaching UI elements
   getOverlay() {
     return this.overlay2D;
+  }
+  
+  // Add method to update zoom level from PreviewManager
+  updateZoomLevel(level) {
+    this.zoomLevel = level;
+    this.resizeOverlay();
   }
   
   // Clean up any resources

@@ -28,6 +28,12 @@ export default class PreviewManager {
       width: 16,
       height: 9
     };
+
+    // Add zoom level tracking
+    this.zoomLevel = 1;
+    this.zoomMin = 0.5;
+    this.zoomMax = 2.5;
+    this.zoomStep = 0.25;
   }
   
   init() {
@@ -102,35 +108,31 @@ export default class PreviewManager {
   
   resizeRenderer() {
     const previewRect = this.preview.getBoundingClientRect();
-    let newWidth, newHeight;
     
-    // Calculate dimensions based on the current aspect ratio
+    // Calculate aspect ratio
     const aspectRatioValue = this.aspectRatio.width / this.aspectRatio.height;
     
-    if (previewRect.width / previewRect.height > aspectRatioValue) {
-      // Width is limiting factor
-      newHeight = previewRect.height;
-      newWidth = newHeight * aspectRatioValue;
-    } else {
-      // Height is limiting factor
-      newWidth = previewRect.width;
-      newHeight = newWidth / aspectRatioValue;
-    }
+    // Base width for 1.0 zoom level
+    const baseWidth = 1280;
     
-    // Set the renderer size to maintain the selected aspect ratio
-    if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
-      this.renderer.setSize(newWidth, newHeight, false);
-      this.camera.aspect = aspectRatioValue; // Set camera aspect ratio
-      this.camera.updateProjectionMatrix();
-    }
+    // Apply zoom factor to get actual dimensions
+    const zoomedWidth = baseWidth * this.zoomLevel;
+    const zoomedHeight = zoomedWidth / aspectRatioValue;
+    
+    // Set the renderer to the zoomed size
+    this.renderer.setSize(zoomedWidth, zoomedHeight, false);
+    
+    // Update camera aspect ratio (should stay constant)
+    this.camera.aspect = aspectRatioValue;
+    this.camera.updateProjectionMatrix();
     
     // Center the canvas in the container
     this.canvas.style.position = 'absolute';
     this.canvas.style.left = '50%';
     this.canvas.style.top = '50%';
     this.canvas.style.transform = 'translate(-50%, -50%)';
-    this.canvas.style.width = `${newWidth}px`;
-    this.canvas.style.height = `${newHeight}px`;
+    this.canvas.style.width = `${zoomedWidth}px`;
+    this.canvas.style.height = `${zoomedHeight}px`;
     
     // Set a neutral background color
     this.preview.style.backgroundColor = '#222222';
@@ -688,5 +690,45 @@ export default class PreviewManager {
     if (this.appState && this.appState.eventBus) {
       this.appState.eventBus.clear('state:aspectRatio');
     }
+  }
+
+  // Add a method to toggle zoom levels
+  toggleZoom(slideManager) {
+    // Increase zoom level by one step
+    this.zoomLevel += this.zoomStep;
+    
+    // Loop back to minimum zoom when maximum is exceeded
+    if (this.zoomLevel > this.zoomMax) {
+      this.zoomLevel = this.zoomMin;
+    }
+    
+    // Apply zoom by resizing the renderer
+    this.resizeRenderer();
+    
+    // Update the slide manager if provided
+    if (slideManager) {
+      slideManager.updateZoomLevel(this.zoomLevel);
+    }
+    
+    console.log(`Zoom level: ${this.zoomLevel.toFixed(2)}x`);
+    
+    // Return current zoom level to display in UI if needed
+    return this.zoomLevel;
+  }
+  
+  // Add a method to set a specific zoom level
+  setZoom(level, slideManager) {
+    // Clamp zoom level to valid range
+    this.zoomLevel = Math.max(this.zoomMin, Math.min(this.zoomMax, level));
+    
+    // Apply zoom by resizing
+    this.resizeRenderer();
+    
+    // Update the slide manager if provided
+    if (slideManager) {
+      slideManager.updateZoomLevel(this.zoomLevel);
+    }
+    
+    return this.zoomLevel;
   }
 }
