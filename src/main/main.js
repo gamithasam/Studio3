@@ -1,6 +1,14 @@
 const { app, BrowserWindow, ipcMain, Menu, dialog, desktopCapturer } = require('electron');
 const path = require('path');
-const fontList = require('font-list');
+let fontList;
+try {
+  fontList = require('font-list');
+} catch (error) {
+  console.error('Failed to load font-list module:', error);
+  fontList = {
+    getFonts: async () => [] // Return empty array if module is not available
+  };
+}
 const fs = require('fs');
 
 // Import the render window manager
@@ -286,7 +294,16 @@ ipcMain.handle('get-system-fonts', async () => {
     return fonts.map(font => font.replace(/"/g, ''));
   } catch (error) {
     console.error('Error fetching fonts:', error);
-    return [];
+    return [
+      'Arial',
+      'Helvetica',
+      'Times New Roman',
+      'Times',
+      'Courier New',
+      'Courier',
+      'Verdana',
+      'Georgia'
+    ]; // Fallback to basic fonts
   }
 });
 
