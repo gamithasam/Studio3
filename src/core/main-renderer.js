@@ -231,35 +231,37 @@ export default class MainRenderer {
         this.appState.setState({ aspectRatio });
       });
     }
-  }
 
-  // Toggle zoom dropdown visibility
+    // Handle view mode changes from menu
+    if (window.electron && window.electron.onSetViewMode) {
+      this.viewModeCleanup = window.electron.onSetViewMode((mode) => {
+        if (this.layoutManager) {
+          // Use the layout manager to change the view mode
+          this.layoutManager.setViewMode(mode);
+        }
+      });
+    }
+  }
+  
   toggleZoomDropdown(e) {
     e.stopPropagation();
     const zoomDropdown = document.getElementById('zoomDropdown');
     zoomDropdown.classList.toggle('visible');
-    
-    // Update active class based on current zoom level
     this.updateActiveZoomOption();
   }
   
-  // Handle zoom option click
   handleZoomOptionClick(e) {
     const zoomLevel = e.target.getAttribute('data-zoom');
     const zoomDropdown = document.getElementById('zoomDropdown');
-    
     if (zoomLevel === 'fit') {
       this.fitSlideToView();
     } else {
       const numericZoom = parseFloat(zoomLevel);
       this.setZoomLevel(numericZoom);
     }
-    
-    // Hide dropdown after selection
     zoomDropdown.classList.remove('visible');
   }
   
-  // Set a specific zoom level
   setZoomLevel(level) {
     if (this.previewManager) {
       const zoomLevel = this.previewManager.setZoom(level, this.slideManager);
@@ -268,7 +270,6 @@ export default class MainRenderer {
     }
   }
   
-  // Fit slide to view (calculate optimal zoom level based on container size)
   fitSlideToView() {
     if (this.previewManager && this.slideManager) {
       const preview = document.getElementById('preview');
@@ -277,40 +278,29 @@ export default class MainRenderer {
       const aspectRatio = this.appState.getState('aspectRatio');
       const aspectRatioValue = aspectRatio.width / aspectRatio.height;
       
-      // Calculate target area (constant from preview-manager.js)
       const targetArea = 1280 * 720;
       const baseWidth = Math.sqrt(targetArea * aspectRatioValue);
       
-      // Calculate zoom level to fit preview container
       let fitZoom;
       if (previewRect.width / previewRect.height > aspectRatioValue) {
-        // Height is limiting factor
         fitZoom = previewRect.height / (baseWidth / aspectRatioValue);
       } else {
-        // Width is limiting factor
         fitZoom = previewRect.width / baseWidth;
       }
       
-      // Apply a margin factor to ensure it fits with some padding
       fitZoom = fitZoom * 0.9;
-      
       this.setZoomLevel(fitZoom);
       this.zoomBtn.textContent = `🔍 Fit`;
     }
   }
   
-  // Update active class on zoom options
   updateActiveZoomOption() {
     if (!this.previewManager) return;
-    
     const currentZoom = this.previewManager.zoomLevel;
     const zoomOptions = document.querySelectorAll('.zoom-option');
-    
     zoomOptions.forEach(option => {
       const optionZoom = option.getAttribute('data-zoom');
-      
       if (optionZoom === 'fit') {
-        // Special case for "Fit" option
         option.classList.remove('active');
       } else if (Math.abs(parseFloat(optionZoom) - currentZoom) < 0.01) {
         option.classList.add('active');
@@ -321,17 +311,12 @@ export default class MainRenderer {
   }
   
   runUserCode(code) {
-    // Don't re-run if in presentation mode, update the presentation instead
     if (this.appState.getState('isPlaying')) {
       this.presentationController.updateCode(code);
       return;
     }
-    
     try {
-      // Reset the scene and slide manager
       this.slideManager.destroy();
-      
-      // Run the code in a sandboxed function
       const userFn = new Function('THREE', 'gsap', 'scene', 'playSlides', code);
       userFn(THREE, gsap, this.previewManager.getScene(), this.playSlides.bind(this));
     } catch (err) {
@@ -340,7 +325,6 @@ export default class MainRenderer {
   }
   
   playSlides(slides) {
-    // Load slides into the slide manager
     const slideCount = this.slideManager.loadSlides(slides, this.projectManager);
     console.log(`Loaded ${slideCount} slides`);
   }
@@ -350,7 +334,6 @@ export default class MainRenderer {
     const newSlideTemplate = `
     {
       init({ scene, container }) {
-        // New Slide
         const geometry = new THREE.BoxGeometry();
         const material = new THREE.MeshBasicMaterial({ color: 0x0000ff });
         const mesh = new THREE.Mesh(geometry, material);
@@ -364,16 +347,12 @@ export default class MainRenderer {
         gsap.to(mesh.position, { duration: 1, x: 2 });
       }
     }`;
-    
-    // Insert new slide into the code
     const slides = this.slideManager.getSlidesArray();
     const lastBracketIndex = currentCode.lastIndexOf(']');
     const newCode = currentCode.slice(0, lastBracketIndex) +
       (slides.length > 0 ? ',' : '') +
       newSlideTemplate +
       currentCode.slice(lastBracketIndex);
-    
-    // Update editor and run code
     this.editorManager.setOriginalCode(newCode);
     this.runUserCode(newCode);
   }
@@ -388,13 +367,9 @@ export default class MainRenderer {
   
   handleKeyDown(e) {
     if (e.key === 'Enter') {
-      // Run/re-run the code when Enter is pressed
-      // The editor manager already handles this via its setupKeyEvents method
     } else if (e.key === 'ArrowRight') {
-      // Move to next slide
       this.slideManager.nextSlide();
     } else if (e.key === 'ArrowLeft') {
-      // Move to previous slide
       this.slideManager.prevSlide();
     }
   }
@@ -408,17 +383,18 @@ export default class MainRenderer {
   }
   
   cleanup() {
-    // Clean up aspect ratio listener if it exists
     if (this.aspectRatioCleanup) {
       this.aspectRatioCleanup();
     }
     
-    // Clean up controllers
+    if (this.viewModeCleanup) {
+      this.viewModeCleanup();
+    }
+    
     if (this.presentationController) {
       this.presentationController.destroy();
     }
     
-    // Clean up managers that need explicit cleanup
     if (this.previewManager) {
       this.previewManager.destroy();
     }
@@ -427,7 +403,6 @@ export default class MainRenderer {
       this.slideManager.destroy();
     }
     
-    // Clear event bus
     if (this.eventBus) {
       this.eventBus.clear();
     }

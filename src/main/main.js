@@ -177,6 +177,31 @@ function createMenu() {
         { role: 'togglefullscreen' },
         { type: 'separator' },
         {
+          label: 'View Mode',
+          submenu: [
+            {
+              label: 'Code Only',
+              type: 'radio',
+              accelerator: 'CmdOrCtrl+1',
+              click: () => mainWindow.webContents.send('set-view-mode', 'code-only')
+            },
+            {
+              label: 'Split View',
+              type: 'radio',
+              checked: true,
+              accelerator: 'CmdOrCtrl+2',
+              click: () => mainWindow.webContents.send('set-view-mode', 'split')
+            },
+            {
+              label: 'Preview Only',
+              type: 'radio',
+              accelerator: 'CmdOrCtrl+3',
+              click: () => mainWindow.webContents.send('set-view-mode', 'preview-only')
+            }
+          ]
+        },
+        { type: 'separator' },
+        {
           label: 'Aspect Ratio',
           submenu: [
             {

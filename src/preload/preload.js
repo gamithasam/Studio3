@@ -38,5 +38,8 @@ contextBridge.exposeInMainWorld('electron', {
     return () => {
       ipcRenderer.removeAllListeners('aspect-ratio-changed');
     };
-  }
+  },
+  
+  // Add a listener for view mode changes
+  onSetViewMode: (callback) => ipcRenderer.on('set-view-mode', (_, mode) => callback(mode))
 });
