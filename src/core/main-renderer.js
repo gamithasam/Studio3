@@ -36,6 +36,11 @@ export default class MainRenderer {
     this.toolbarAddSlideBtn = document.getElementById('toolbarAddSlideBtn');
     this.addMediaBtn = document.getElementById('addMediaBtn');
     this.zoomBtn = document.getElementById('zoomBtn'); // Add reference to zoom button
+    this.shapesBtn = document.getElementById('shapesBtn');
+    this.shapesDropdownBtn = document.getElementById('shapesDropdownBtn');
+    
+    // Store current selected shape (default to rectangle)
+    this.currentShape = 'rectangle';
     
     // Make external libraries available
     window.Water = Water;
@@ -163,15 +168,40 @@ export default class MainRenderer {
       option.addEventListener('click', this.handleZoomOptionClick.bind(this));
     });
     
-    // Close zoom dropdown when clicking outside
+    // Shapes button functionality
+    if (this.shapesBtn && this.shapesDropdownBtn) {
+      console.log('Setting up shapes button event listeners');
+      this.shapesBtn.addEventListener('click', this.addShapeToSlide.bind(this));
+      this.shapesDropdownBtn.addEventListener('click', this.toggleShapesDropdown.bind(this));
+      
+      // Add event listeners for shape options
+      const shapeOptions = document.querySelectorAll('.shape-option');
+      console.log('Found', shapeOptions.length, 'shape options');
+      shapeOptions.forEach(option => {
+        option.addEventListener('click', this.handleShapeOptionClick.bind(this));
+      });
+    } else {
+      console.warn('Shapes buttons not found in DOM');
+      console.log('shapesBtn:', this.shapesBtn);
+      console.log('shapesDropdownBtn:', this.shapesDropdownBtn);
+    }
+    
+    // Close zoom and shapes dropdowns when clicking outside
     document.addEventListener('click', (e) => {
       const zoomDropdown = document.getElementById('zoomDropdown');
       const zoomBtn = document.getElementById('zoomBtn');
+      const shapesDropdown = document.getElementById('shapesDropdown');
+      const shapesContainer = document.querySelector('.shapes-dropdown-container');
       
       if (zoomDropdown.classList.contains('visible') && 
           !zoomDropdown.contains(e.target) && 
           e.target !== zoomBtn) {
         zoomDropdown.classList.remove('visible');
+      }
+      
+      if (shapesDropdown.classList.contains('visible') && 
+          !shapesContainer.contains(e.target)) {
+        shapesDropdown.classList.remove('visible');
       }
     });
     
@@ -241,6 +271,10 @@ export default class MainRenderer {
         }
       });
     }
+    
+    // Initialize shapes button with default shape
+    this.updateShapeButton();
+    console.log('Shapes functionality initialized successfully');
   }
   
   toggleZoomDropdown(e) {
@@ -308,6 +342,206 @@ export default class MainRenderer {
         option.classList.remove('active');
       }
     });
+  }
+  
+  // Shapes functionality methods
+  toggleShapesDropdown(e) {
+    e.stopPropagation();
+    try {
+      const shapesDropdown = document.getElementById('shapesDropdown');
+      if (shapesDropdown) {
+        shapesDropdown.classList.toggle('visible');
+        this.updateActiveShapeOption();
+      }
+    } catch (error) {
+      console.error('Error toggling shapes dropdown:', error);
+    }
+  }
+  
+  handleShapeOptionClick(e) {
+    try {
+      const shapeType = e.target.closest('.shape-option').getAttribute('data-shape');
+      if (shapeType) {
+        this.currentShape = shapeType;
+        this.updateShapeButton();
+        
+        const shapesDropdown = document.getElementById('shapesDropdown');
+        if (shapesDropdown) {
+          shapesDropdown.classList.remove('visible');
+        }
+      }
+    } catch (error) {
+      console.error('Error handling shape option click:', error);
+    }
+  }
+  
+  updateShapeButton() {
+    try {
+      const shapeIcons = {
+        'rectangle': '⬛',
+        'circle': '●',
+        'triangle': '▲',
+        'star': '★',
+        'diamond': '♦',
+        'arrow': '→'
+      };
+      
+      const shapeIcon = this.shapesBtn?.querySelector('.shape-icon');
+      const shapeLabel = this.shapesBtn?.querySelector('.shape-label');
+      
+      if (shapeIcon && shapeLabel) {
+        shapeIcon.textContent = shapeIcons[this.currentShape] || '⬛';
+        shapeLabel.textContent = this.currentShape.charAt(0).toUpperCase() + this.currentShape.slice(1);
+      }
+    } catch (error) {
+      console.error('Error updating shape button:', error);
+    }
+  }
+  
+  updateActiveShapeOption() {
+    try {
+      const shapeOptions = document.querySelectorAll('.shape-option');
+      shapeOptions.forEach(option => {
+        const optionShape = option.getAttribute('data-shape');
+        if (optionShape === this.currentShape) {
+          option.classList.add('active');
+        } else {
+          option.classList.remove('active');
+        }
+      });
+    } catch (error) {
+      console.error('Error updating active shape option:', error);
+    }
+  }
+  
+  addShapeToSlide() {
+    try {
+      if (!this.slideManager || !this.editorManager) {
+        console.warn('SlideManager or EditorManager not initialized');
+        return;
+      }
+      
+      const currentSlideIndex = this.slideManager.currentSlideIndex;
+      if (currentSlideIndex < 0) {
+        console.warn('No slide selected');
+        return;
+      }
+      
+      console.log(`Adding ${this.currentShape} to slide ${currentSlideIndex}`);
+      
+      // Generate shape element HTML based on current shape type
+      const shapeHTML = this.generateShapeHTML(this.currentShape);
+      
+      // Add the shape to the current slide's code
+      this.addShapeToSlideCode(currentSlideIndex, shapeHTML);
+    } catch (error) {
+      console.error('Error adding shape to slide:', error);
+    }
+  }
+  
+  generateShapeHTML(shapeType) {
+    const shapeId = `shape-${Date.now()}`;
+    const baseStyles = `
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      user-select: none;
+    `;
+    
+    switch (shapeType) {
+      case 'rectangle':
+        return `<div id="${shapeId}" style="${baseStyles} width: 100px; height: 60px; background: #007acc; border-radius: 4px;"></div>`;
+      
+      case 'circle':
+        return `<div id="${shapeId}" style="${baseStyles} width: 80px; height: 80px; background: #ff6b35; border-radius: 50%;"></div>`;
+      
+      case 'triangle':
+        return `<div id="${shapeId}" style="${baseStyles} width: 0; height: 0; border-left: 40px solid transparent; border-right: 40px solid transparent; border-bottom: 70px solid #4caf50;"></div>`;
+      
+      case 'star':
+        return `<div id="${shapeId}" style="${baseStyles} font-size: 48px; color: #ffd700;">★</div>`;
+      
+      case 'diamond':
+        return `<div id="${shapeId}" style="${baseStyles} width: 60px; height: 60px; background: #e91e63; transform: translate(-50%, -50%) rotate(45deg);"></div>`;
+      
+      case 'arrow':
+        return `<div id="${shapeId}" style="${baseStyles} font-size: 48px; color: #9c27b0;">→</div>`;
+      
+      default:
+        return `<div id="${shapeId}" style="${baseStyles} width: 100px; height: 60px; background: #007acc; border-radius: 4px;"></div>`;
+    }
+  }
+  
+  addShapeToSlideCode(slideIndex, shapeHTML) {
+    const slides = this.editorManager.getSlidesArray(this.editorManager.getOriginalCode());
+    const slideCode = slides[slideIndex]?.code;
+    
+    if (!slideCode) return;
+    
+    // Find the container.appendChild or container.innerHTML line to add the shape after
+    const lines = slideCode.split('\n');
+    let insertIndex = -1;
+    
+    // Look for the end of the init function where we can add the shape
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (line.includes('container.appendChild') || line.includes('slide.appendChild')) {
+        insertIndex = i + 1;
+        break;
+      }
+      if (line.includes('return {') || line.includes('return{')) {
+        insertIndex = i;
+        break;
+      }
+    }
+    
+    if (insertIndex === -1) {
+      // If we can't find a good insertion point, add before the return statement
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (lines[i].trim().startsWith('return')) {
+          insertIndex = i;
+          break;
+        }
+      }
+    }
+    
+    if (insertIndex !== -1) {
+      // Create the shape creation code
+      const shapeVariable = `shape${Date.now()}`;
+      const shapeCreationCode = [
+        '',
+        `        // Added shape: ${this.currentShape}`,
+        `        const ${shapeVariable} = document.createElement('div');`,
+        `        ${shapeVariable}.innerHTML = \`${shapeHTML}\`;`,
+        `        const shapeElement = ${shapeVariable}.firstChild;`,
+        `        container.appendChild(shapeElement);`
+      ];
+      
+      // Insert the shape creation code
+      lines.splice(insertIndex, 0, ...shapeCreationCode);
+      
+      const updatedSlideCode = lines.join('\n');
+      
+      // Update the code in the editor
+      const updatedCode = this.editorManager.getOriginalCode().replace(
+        slideCode,
+        updatedSlideCode
+      );
+      
+      this.editorManager.setOriginalCode(updatedCode);
+      
+      // Update the editor display
+      if (this.editorManager.showSingleSlide && this.editorManager.currentSlideIndex === slideIndex) {
+        this.editorManager.editorInstance.setValue(`(${updatedSlideCode})`);
+      } else if (!this.editorManager.showSingleSlide) {
+        this.editorManager.editorInstance.setValue(updatedCode);
+      }
+      
+      // Re-run the code to show the new shape
+      this.runUserCode(updatedCode);
+    }
   }
   
   runUserCode(code) {

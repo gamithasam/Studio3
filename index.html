@@ -88,6 +88,41 @@
           <button id="toolbarAddSlideBtn">Add New Slide</button>
           <button id="playBtn">▶ Play</button>
           
+          <!-- Shapes button with dropdown -->
+          <div class="shapes-dropdown-container">
+            <button id="shapesBtn" class="shapes-main-btn">
+              <span class="shape-icon">⬛</span>
+              <span class="shape-label">Shapes</span>
+            </button>
+            <button id="shapesDropdownBtn" class="shapes-dropdown-btn">▼</button>
+            <div class="shapes-dropdown" id="shapesDropdown">
+              <div class="shape-option" data-shape="rectangle">
+                <span class="shape-preview">⬛</span>
+                <span>Rectangle</span>
+              </div>
+              <div class="shape-option" data-shape="circle">
+                <span class="shape-preview">●</span>
+                <span>Circle</span>
+              </div>
+              <div class="shape-option" data-shape="triangle">
+                <span class="shape-preview">▲</span>
+                <span>Triangle</span>
+              </div>
+              <div class="shape-option" data-shape="star">
+                <span class="shape-preview">★</span>
+                <span>Star</span>
+              </div>
+              <div class="shape-option" data-shape="diamond">
+                <span class="shape-preview">♦</span>
+                <span>Diamond</span>
+              </div>
+              <div class="shape-option" data-shape="arrow">
+                <span class="shape-preview">→</span>
+                <span>Arrow</span>
+              </div>
+            </div>
+          </div>
+          
           <!-- Replace simple zoom button with dropdown container -->
           <div class="zoom-dropdown-container">
             <button id="zoomBtn">🔍 100%</button>
