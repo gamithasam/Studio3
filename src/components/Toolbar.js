@@ -9,7 +9,8 @@ import {
   Sun, 
   Moon,
   Save,
-  FolderOpen
+  FolderOpen,
+  Palette
 } from 'lucide-react';
 
 const Toolbar = ({ 
@@ -21,6 +22,7 @@ const Toolbar = ({
   onThemeChange 
 }) => {
   const viewModes = [
+    { id: 'design', label: 'Design', icon: Palette },
     { id: 'code', label: 'Code Only', icon: Code },
     { id: 'split', label: 'Split View', icon: Monitor },
     { id: 'preview', label: 'Preview Only', icon: Eye },
