@@ -427,20 +427,54 @@ export default class MainRenderer {
         return;
       }
       
-      console.log(`Adding ${this.currentShape} to slide ${currentSlideIndex}`);
+      console.log(`Adding ${this.currentShape} to slide ${currentSlideIndex + 1}`);
       
       // Generate shape element HTML based on current shape type
       const shapeHTML = this.generateShapeHTML(this.currentShape);
       
       // Add the shape to the current slide's code
       this.addShapeToSlideCode(currentSlideIndex, shapeHTML);
+      
+      // Show success message briefly
+      this.showShapeAddedFeedback();
     } catch (error) {
       console.error('Error adding shape to slide:', error);
     }
   }
   
+  showShapeAddedFeedback() {
+    // Create or update feedback element
+    let feedback = document.getElementById('shape-added-feedback');
+    if (!feedback) {
+      feedback = document.createElement('div');
+      feedback.id = 'shape-added-feedback';
+      feedback.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 14px;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      `;
+      document.body.appendChild(feedback);
+    }
+    
+    feedback.textContent = `${this.currentShape.charAt(0).toUpperCase() + this.currentShape.slice(1)} added to slide`;
+    feedback.style.opacity = '1';
+    
+    // Hide after 2 seconds
+    setTimeout(() => {
+      feedback.style.opacity = '0';
+    }, 2000);
+  }
+  
   generateShapeHTML(shapeType) {
-    const shapeId = `shape-${Date.now()}`;
+    const shapeId = `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const baseStyles = `
       position: absolute;
       left: 50%;
@@ -450,27 +484,30 @@ export default class MainRenderer {
       user-select: none;
     `;
     
+    // Add data attributes for shape identification and properties
+    const dataAttributes = `data-shape-type="${shapeType}" data-shape-id="${shapeId}" data-editable-shape="true"`;
+    
     switch (shapeType) {
       case 'rectangle':
-        return `<div id="${shapeId}" style="${baseStyles} width: 100px; height: 60px; background: #007acc; border-radius: 4px;"></div>`;
+        return `<div id="${shapeId}" ${dataAttributes} style="${baseStyles} width: 100px; height: 60px; background: #007acc; border-radius: 4px;"></div>`;
       
       case 'circle':
-        return `<div id="${shapeId}" style="${baseStyles} width: 80px; height: 80px; background: #ff6b35; border-radius: 50%;"></div>`;
+        return `<div id="${shapeId}" ${dataAttributes} style="${baseStyles} width: 80px; height: 80px; background: #ff6b35; border-radius: 50%;"></div>`;
       
       case 'triangle':
-        return `<div id="${shapeId}" style="${baseStyles} width: 0; height: 0; border-left: 40px solid transparent; border-right: 40px solid transparent; border-bottom: 70px solid #4caf50;"></div>`;
+        return `<div id="${shapeId}" ${dataAttributes} style="${baseStyles} width: 0; height: 0; border-left: 40px solid transparent; border-right: 40px solid transparent; border-bottom: 70px solid #4caf50; background: transparent;"></div>`;
       
       case 'star':
-        return `<div id="${shapeId}" style="${baseStyles} font-size: 48px; color: #ffd700;">★</div>`;
+        return `<div id="${shapeId}" ${dataAttributes} style="${baseStyles} font-size: 48px; color: #ffd700; background: transparent;">★</div>`;
       
       case 'diamond':
-        return `<div id="${shapeId}" style="${baseStyles} width: 60px; height: 60px; background: #e91e63; transform: translate(-50%, -50%) rotate(45deg);"></div>`;
+        return `<div id="${shapeId}" ${dataAttributes} style="${baseStyles} width: 60px; height: 60px; background: #e91e63; transform: translate(-50%, -50%) rotate(45deg);"></div>`;
       
       case 'arrow':
-        return `<div id="${shapeId}" style="${baseStyles} font-size: 48px; color: #9c27b0;">→</div>`;
+        return `<div id="${shapeId}" ${dataAttributes} style="${baseStyles} font-size: 48px; color: #9c27b0; background: transparent;">→</div>`;
       
       default:
-        return `<div id="${shapeId}" style="${baseStyles} width: 100px; height: 60px; background: #007acc; border-radius: 4px;"></div>`;
+        return `<div id="${shapeId}" ${dataAttributes} style="${baseStyles} width: 100px; height: 60px; background: #007acc; border-radius: 4px;"></div>`;
     }
   }
   
@@ -508,14 +545,24 @@ export default class MainRenderer {
     }
     
     if (insertIndex !== -1) {
-      // Create the shape creation code
-      const shapeVariable = `shape${Date.now()}`;
+      // Extract shape ID for unique variable naming
+      const shapeIdMatch = shapeHTML.match(/id="([^"]+)"/);
+      const shapeId = shapeIdMatch ? shapeIdMatch[1] : `shape_${Date.now()}`;
+      const shapeVariable = shapeId.replace(/-/g, '_');
+      
+      // Create the shape creation code with proper event listeners
       const shapeCreationCode = [
         '',
         `        // Added shape: ${this.currentShape}`,
         `        const ${shapeVariable} = document.createElement('div');`,
         `        ${shapeVariable}.innerHTML = \`${shapeHTML}\`;`,
         `        const shapeElement = ${shapeVariable}.firstChild;`,
+        `        // Add click handler for shape selection`,
+        `        shapeElement.addEventListener('click', (e) => {`,
+        `          e.stopPropagation();`,
+        `          // Trigger shape selection`,
+        `          window.mainRenderer?.elementEditor?.selectShape?.(shapeElement);`,
+        `        });`,
         `        container.appendChild(shapeElement);`
       ];
       
@@ -541,6 +588,9 @@ export default class MainRenderer {
       
       // Re-run the code to show the new shape
       this.runUserCode(updatedCode);
+      
+      // Make the mainRenderer available globally for shape click handlers
+      window.mainRenderer = this;
     }
   }
   
